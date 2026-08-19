@@ -682,6 +682,216 @@
     .ficha__tab { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .seal-badge, .status-pill, .risk-tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
+
+  /* =========================================================
+     RESPONSIVIDADE COMPLETA PARA CELULARES & TABLETS (MOBILE)
+     ========================================================= */
+  @media (max-width: 768px) {
+    body {
+      font-size: 0.95rem;
+    }
+
+    .app-layout {
+      padding: 0 0.75rem 2.5rem !important;
+      gap: 0 !important;
+      display: block !important;
+    }
+
+    .sidebar-left, .sidebar-right {
+      display: none !important;
+    }
+
+    .shell {
+      max-width: 100% !important;
+    }
+
+    .letterhead {
+      padding: 1.5rem 0 1rem !important;
+      margin-bottom: 1rem !important;
+    }
+
+    .letterhead-inner {
+      gap: 0.75rem !important;
+    }
+
+    .seal-mark {
+      width: 38px !important;
+      height: 38px !important;
+    }
+
+    .wordmark h1 {
+      font-size: 1.5rem !important;
+      line-height: 1.2 !important;
+    }
+
+    .wordmark p {
+      font-size: 0.65rem !important;
+      letter-spacing: 0.06em !important;
+    }
+
+    .mode-nav {
+      display: flex !important;
+      width: 100% !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      margin-bottom: 1rem !important;
+    }
+
+    .tab-btn {
+      flex: 1 !important;
+      text-align: center !important;
+      padding: 0.65rem 0.5rem !important;
+      font-size: 0.76rem !important;
+      white-space: nowrap !important;
+    }
+
+    .search-panel {
+      padding: 1.1rem !important;
+      margin-bottom: 1.25rem !important;
+    }
+
+    .field-row {
+      flex-direction: column !important;
+      gap: 0.85rem !important;
+    }
+
+    #cnpj {
+      font-size: 16px !important; /* Evita zoom automático no iOS Safari */
+      padding: 0.65rem 0.2rem !important;
+      width: 100% !important;
+    }
+
+    .btn-primary {
+      width: 100% !important;
+      padding: 0.8rem 1rem !important;
+      font-size: 0.95rem !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    .action-bar {
+      flex-direction: column !important;
+      gap: 0.5rem !important;
+      margin-bottom: 1rem !important;
+    }
+
+    .btn-action {
+      width: 100% !important;
+      justify-content: center !important;
+      padding: 0.7rem 1rem !important;
+      font-size: 0.84rem !important;
+    }
+
+    .risk-card {
+      padding: 1rem !important;
+      margin-bottom: 1.25rem !important;
+    }
+
+    .risk-card__head {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 0.5rem !important;
+    }
+
+    .risk-tags {
+      gap: 0.4rem !important;
+    }
+
+    .risk-tag {
+      font-size: 0.72rem !important;
+      width: 100% !important;
+    }
+
+    .dossier-card {
+      margin-bottom: 1.25rem !important;
+    }
+
+    .dossier-card__head {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 0.5rem !important;
+      padding: 0.9rem 1rem !important;
+    }
+
+    .head-right {
+      width: 100% !important;
+      justify-content: space-between !important;
+    }
+
+    .ledger-grid {
+      grid-template-columns: 1fr !important;
+      gap: 0.9rem !important;
+      padding: 1rem !important;
+    }
+
+    .ledger-grid .span-2,
+    .ledger-grid .span-3 {
+      grid-column: span 1 !important;
+    }
+
+    .field .value.is-display {
+      font-size: 1.1rem !important;
+      word-break: break-word !important;
+    }
+
+    .field .value {
+      word-break: break-word !important;
+      font-size: 0.9rem !important;
+    }
+
+    #listaIE, #listaQSA {
+      padding: 1rem !important;
+      gap: 0.75rem !important;
+    }
+
+    .ficha {
+      flex-direction: column !important;
+    }
+
+    .ficha__tab {
+      width: 100% !important;
+      height: 38px !important;
+      font-size: 1.15rem !important;
+      border-right: none !important;
+      border-bottom: 1px solid var(--hairline) !important;
+    }
+
+    .ficha__body {
+      padding: 0.9rem !important;
+    }
+
+    .ficha-grid {
+      grid-template-columns: 1fr !important;
+      gap: 0.65rem !important;
+    }
+
+    .official-links-grid {
+      grid-template-columns: 1fr !important;
+      padding: 1rem !important;
+      gap: 0.75rem !important;
+    }
+
+    .btn-maps {
+      display: inline-flex !important;
+      margin-top: 0.35rem !important;
+      margin-left: 0 !important;
+    }
+
+    .upload-area {
+      padding: 1.25rem 0.75rem !important;
+    }
+
+    .batch-table-wrap {
+      -webkit-overflow-scrolling: touch !important;
+    }
+
+    .batch-table th, .batch-table td {
+      padding: 0.5rem 0.6rem !important;
+      font-size: 0.75rem !important;
+    }
+  }
+
 </style>
 </head>
 <body>
