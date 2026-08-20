@@ -13,26 +13,40 @@
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6168313885664825" crossorigin="anonymous"></script>
 
 <style>
-  :root{
-    --ink:#1c2b3f;
-    --ink-soft:#3c4f66;
-    --paper:#eef0ec;
-    --surface:#ffffff;
-    --hairline:#d7dbd2;
-    --muted:#75807a;
-    --brass:#92682f;
-    --brass-soft:#cdab78;
-    --forest:#2c6249;
-    --forest-soft:#e3eee7;
-    --brick:#8a3a35;
-    --brick-soft:#f3e3e1;
-    --amber:#b45309;
-    --amber-soft:#fef3c7;
-    --focus:#2f5fa3;
-    --font-display:'Source Serif 4', Georgia, serif;
-    --font-body:'Inter', system-ui, sans-serif;
-    --font-mono:'IBM Plex Mono', monospace;
-  }
+  :root {
+  /* Bases e Fundo */
+  --paper: #f1f5f9;         /* Fundo moderno slate claro */
+  --surface: #ffffff;       /* Cards brancos nítidos */
+  --hairline: #e2e8f0;      /* Divisores definidos */
+  
+  /* Tipografia e Contraste */
+  --ink: #0f172a;           /* Texto principal ultra legível */
+  --ink-soft: #1e293b;      /* Títulos secundários */
+  --muted: #475569;         /* Rótulos e legendas de alto contraste */
+  
+  /* Cores de Destaque e Ação */
+  --brass: #2563eb;         /* Azul vibrante para abas e bordas de foco */
+  --brass-soft: #dbeafe;    /* Fundo suave para seleção */
+  --focus: #1d4ed8;         /* Links e botões secundários */
+  
+  /* Badges e Status */
+  --forest: #15803d;        /* Verde sucesso nítido */
+  --forest-soft: #dcfce7;   /* Fundo verde suave */
+  --brick: #b91c1c;         /* Vermelho alerta nítido */
+  --brick-soft: #fee2e2;    /* Fundo vermelho suave */
+  --amber: #b45309;         /* Amarelo/Laranja de aviso */
+  --amber-soft: #fef3c7;    /* Fundo aviso suave */
+  
+  /* Tipografia */
+  --font-display: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+/* Sombra suave aos cards para criar profundidade */
+.dossier-card, .search-panel, .ad-slot, .risk-card {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+}
 
   *{box-sizing:border-box;}
   body{
@@ -282,7 +296,7 @@
     padding:2rem;
     text-align:center;
     cursor:pointer;
-    background:#fafbfa;
+    background:#f8fafc;
     transition:all 0.15s ease;
     margin-bottom:1.25rem;
   }
@@ -332,7 +346,7 @@
     text-align:left;
   }
   .batch-table th{
-    background:#f7f7f4;
+    background:#f8fafc;
     font-family:var(--font-mono);
     font-size:0.72rem;
     text-transform:uppercase;
@@ -365,7 +379,7 @@
     transition:all 0.15s ease;
   }
   .btn-action:hover{
-    background:#f7f7f4;
+    background:#f8fafc;
     border-color:var(--brass);
     color:var(--ink);
   }
@@ -393,7 +407,7 @@
     vertical-align:middle;
   }
   .btn-maps:hover{
-    background:#f0f4fa;
+    background:#eff6ff;
     border-color:var(--focus);
   }
 
@@ -437,7 +451,7 @@
     gap:1rem;
     padding:1.1rem 1.5rem;
     border-bottom:1px solid var(--hairline);
-    background:#f7f7f4;
+    background:#f8fafc;
   }
   .dossier-card__head h2{
     font-family:var(--font-display);
@@ -528,7 +542,7 @@
     font-family:var(--font-display);
     font-weight:700;
     font-size:1.5rem;
-    background:#f7f7f4;
+    background:#f8fafc;
     color:var(--ink-soft);
     border-right:1px solid var(--hairline);
   }
@@ -627,7 +641,7 @@
   }
   .official-link-card:hover{
     border-color:var(--brass);
-    background:#fafbfa;
+    background:#f8fafc;
     transform:translateY(-1px);
   }
   .official-link-card__title{
