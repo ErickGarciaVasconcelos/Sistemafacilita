@@ -5,6 +5,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SIBADE — Consulta Integrada de Cadastro</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232563eb'/><text x='50%' y='55%' dominant-baseline='central' text-anchor='middle' font-size='56' fill='white' font-family='sans-serif' font-weight='bold'>SF</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -922,7 +924,7 @@
            data-ad-client="ca-pub-6168313885664825"
            data-ad-slot="SLOT_LATERAL_ESQ_1"
            data-ad-format="rectangle"></ins>
-      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
     </div>
 
     <div class="sticky-ad-box">
@@ -933,7 +935,7 @@
              data-ad-client="ca-pub-6168313885664825"
              data-ad-slot="SLOT_LATERAL_ESQ_2"
              data-ad-format="vertical"></ins>
-        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
       </div>
     </div>
   </aside>
@@ -964,7 +966,7 @@
            data-ad-slot="SLOT_TOPO_PRINCIPAL"
            data-ad-format="auto"
            data-full-width-responsive="true"></ins>
-      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
     </div>
 
     <nav class="mode-nav">
@@ -1211,7 +1213,7 @@
                data-ad-slot="SLOT_RODAPE_DOSSIE"
                data-ad-format="auto"
                data-full-width-responsive="true"></ins>
-          <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
         </div>
 
       </div>
@@ -1243,11 +1245,23 @@
           </div>
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem;">
-          <button type="button" id="btnProcessBatch" class="btn-primary" style="display:none;">Iniciar Consulta em Lote</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-top:1.25rem;">
+          <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+            <button type="button" id="btnProcessBatch" class="btn-primary" style="display:none;">Iniciar Consulta em Lote</button>
+            <button type="button" id="btnCancelBatch" class="btn-secondary" style="display:none; background:#fee2e2; color:#b91c1c; border-color:#fca5a5; font-weight:600;">
+              <span>⏹</span> <span>Cancelar Consulta</span>
+            </button>
+          </div>
           <button type="button" id="btnExportBatch" class="btn-action" style="display:none;">
             <span>📥</span> <span>Exportar Resultados (CSV/Excel)</span>
           </button>
+        </div>
+
+        <div id="batchSummaryStats" style="display:none; margin-top:1.25rem; padding:0.85rem 1.25rem; background:var(--surface); border:1px solid var(--hairline); border-radius:8px; font-size:0.875rem; justify-content:space-between; flex-wrap:wrap; gap:0.75rem; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+          <div><span style="color:var(--muted);">Total:</span> <strong id="statTotal" class="mono">0</strong></div>
+          <div><span style="color:var(--forest);">✔ Sucesso:</span> <strong id="statSuccess" class="mono" style="color:var(--forest);">0</strong></div>
+          <div><span style="color:var(--brick);">✖ Falha/Limite:</span> <strong id="statErrors" class="mono" style="color:var(--brick);">0</strong></div>
+          <div><span style="color:var(--focus);">⚡ No Cache:</span> <strong id="statCached" class="mono" style="color:var(--focus);">0</strong></div>
         </div>
       </section>
 
@@ -1282,7 +1296,7 @@
            data-ad-client="ca-pub-6168313885664825"
            data-ad-slot="SLOT_LATERAL_DIR_1"
            data-ad-format="rectangle"></ins>
-      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
     </div>
 
     <div class="sticky-ad-box">
@@ -1293,7 +1307,7 @@
              data-ad-client="ca-pub-6168313885664825"
              data-ad-slot="SLOT_LATERAL_DIR_2"
              data-ad-format="vertical"></ins>
-        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
       </div>
     </div>
   </aside>
@@ -1301,10 +1315,20 @@
 </div>
 
 <script>
+/* ==========================================================================
+   SIBADE - Sistema Integrado de Consulta Cadastral & Processamento em Lote
+   Engine Multi-Provider (BrasilAPI + MinhaReceita + CNPJ.ws) com Cache Local e Retentativa Inteligente
+   ========================================================================== */
+
 let dadosAtivos = null;
 let batchCnpjs = [];
 let batchResultados = [];
+let batchCancelRequested = false;
+let isBatchRunning = false;
+
 const STORAGE_KEY = 'sibade_recent_searches';
+const CACHE_PREFIX = 'sibade_cnpj_cache_';
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
 /* Tabela de URLs do Sintegra por Estado */
 const SINTEGRA_URLS = {
@@ -1348,6 +1372,7 @@ tabSingle.addEventListener('click', () => {
   tabBatch.classList.remove('active');
   singlePanel.style.display = 'block';
   batchPanel.style.display = 'none';
+  inicializarAdSense();
 });
 
 tabBatch.addEventListener('click', () => {
@@ -1355,6 +1380,7 @@ tabBatch.addEventListener('click', () => {
   tabSingle.classList.remove('active');
   singlePanel.style.display = 'none';
   batchPanel.style.display = 'block';
+  inicializarAdSense();
 });
 
 /* Funções Utilitárias */
@@ -1427,7 +1453,7 @@ function avaliarRisco(dados) {
   return { flags, nivelRisco };
 }
 
-/* Histórico (LocalStorage) */
+/* Histórico de Consultas Recentes (LocalStorage) */
 function carregarHistorico() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1478,131 +1504,93 @@ document.getElementById('btnClearHistory').addEventListener('click', () => {
   renderizarHistorico();
 });
 
-/* Core de Consulta Cadastral */
-async function buscarDadosCnpj(cnpjLimpo) {
-  let data = null;
-  let inscricoes = [];
-  let socios = [];
-  let tributario = {
-    optanteSimples: false,
-    dataOpcaoSimples: 'Não informada',
-    dataExclusaoSimples: 'Não aplicável',
-    optanteSimei: false,
-    dataOpcaoSimei: 'Não informada',
-    dataExclusaoSimei: 'Não aplicável'
+/* ==========================================================================
+   CACHE LOCAL DE DADOS DE CNPJ (Evita requisições repetidas e economiza cota)
+   ========================================================================== */
+function obterCnpjCache(cnpjLimpo) {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + cnpjLimpo);
+    if (!raw) return null;
+    const item = JSON.parse(raw);
+    if (Date.now() - (item.timestamp || 0) < CACHE_TTL_MS && item.data) {
+      return item.data;
+    }
+    localStorage.removeItem(CACHE_PREFIX + cnpjLimpo);
+  } catch (e) {}
+  return null;
+}
+
+function salvarCnpjCache(cnpjLimpo, data) {
+  try {
+    localStorage.setItem(CACHE_PREFIX + cnpjLimpo, JSON.stringify({
+      timestamp: Date.now(),
+      data: data
+    }));
+  } catch (e) {}
+}
+
+/* Helper para requisições com Timeout AbortController */
+async function fetchComTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
+/* Normalizador de Resposta BrasilAPI / MinhaReceita */
+function normalizarDadosMinhaReceitaOuBrasilApi(resJson, cnpjLimpo) {
+  const data = {
+    cnpj: resJson.cnpj || cnpjLimpo,
+    razao_social: resJson.razao_social || resJson.nome_fantasia || 'Não informada',
+    nome_fantasia: resJson.nome_fantasia || 'Não informado',
+    data_inicio_atividade: formatarData(resJson.data_inicio_atividade),
+    porte: resJson.porte || resJson.codigo_porte || 'DEMAIS',
+    descricao_situacao_cadastral: (resJson.descricao_situacao_cadastral || resJson.situacao_cadastral || 'ATIVA').toUpperCase(),
+    data_situacao_cadastral: formatarData(resJson.data_situacao_cadastral),
+    cnae_codigo: resJson.cnae_fiscal,
+    cnae_descricao: resJson.cnae_fiscal_descricao,
+    logradouro: `${resJson.descricao_tipo_de_logradouro || ''} ${resJson.logradouro || ''}`.trim(),
+    numero: resJson.numero || 'S/N',
+    cep: resJson.cep || '',
+    municipio: resJson.municipio || '',
+    uf: resJson.uf || '',
+    capital_social: resJson.capital_social || 0
   };
 
-  try {
-    const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
-    if (response.ok) {
-      const resJson = await response.json();
-      data = {
-        cnpj: resJson.cnpj,
-        razao_social: resJson.razao_social,
-        nome_fantasia: resJson.nome_fantasia,
-        data_inicio_atividade: formatarData(resJson.data_inicio_atividade),
-        porte: resJson.porte,
-        descricao_situacao_cadastral: resJson.descricao_situacao_cadastral,
-        data_situacao_cadastral: formatarData(resJson.data_situacao_cadastral),
-        cnae_codigo: resJson.cnae_fiscal,
-        cnae_descricao: resJson.cnae_fiscal_descricao,
-        logradouro: `${resJson.descricao_tipo_de_logradouro || ''} ${resJson.logradouro || ''}`.trim(),
-        numero: resJson.numero,
-        cep: resJson.cep,
-        municipio: resJson.municipio,
-        uf: resJson.uf,
-        capital_social: resJson.capital_social
-      };
+  const tributario = {
+    optanteSimples: resJson.opcao_pelo_simples === true,
+    dataOpcaoSimples: formatarData(resJson.data_opcao_pelo_simples),
+    dataExclusaoSimples: formatarData(resJson.data_exclusao_do_simples) || 'Não aplicável',
+    optanteSimei: resJson.opcao_pelo_mei === true,
+    dataOpcaoSimei: formatarData(resJson.data_opcao_pelo_mei),
+    dataExclusaoSimei: formatarData(resJson.data_exclusao_do_mei) || 'Não aplicável'
+  };
 
-      tributario.optanteSimples = resJson.opcao_pelo_simples === true;
-      tributario.dataOpcaoSimples = formatarData(resJson.data_opcao_pelo_simples);
-      tributario.dataExclusaoSimples = formatarData(resJson.data_exclusao_do_simples) || 'Não aplicável';
-      tributario.optanteSimei = resJson.opcao_pelo_mei === true;
-      tributario.dataOpcaoSimei = formatarData(resJson.data_opcao_pelo_mei);
-      tributario.dataExclusaoSimei = formatarData(resJson.data_exclusao_do_mei) || 'Não aplicável';
-
-      if (resJson.inscricoes_estaduais && resJson.inscricoes_estaduais.length > 0) {
-        inscricoes = resJson.inscricoes_estaduais.map(ie => ({
-          uf: ie.estado || resJson.uf || 'UF',
-          ie: ie.inscricao_estadual,
-          ativo: ie.ativo !== false,
-          dataAtualizacao: formatarData(ie.data_atualizacao || ie.data_situacao || resJson.data_situacao_cadastral)
-        }));
-      }
-
-      if (resJson.qsa && resJson.qsa.length > 0) {
-        socios = resJson.qsa.map(s => ({
-          nome: s.nome_socio || s.nome,
-          qualificacao: s.qualificacao_socio || s.qualificacao,
-          pais: s.pais?.nome || s.pais || 'Brasil',
-          faixaEtaria: s.faixa_etaria || 'Não informada'
-        }));
-      }
-    }
-  } catch (err) {
-    console.warn('BrasilAPI falhou, tentando fallback...');
+  let inscricoes = [];
+  if (resJson.inscricoes_estaduais && resJson.inscricoes_estaduais.length > 0) {
+    inscricoes = resJson.inscricoes_estaduais.map(ie => ({
+      uf: ie.estado || resJson.uf || 'UF',
+      ie: ie.inscricao_estadual || ie.ie,
+      ativo: ie.ativo !== false,
+      dataAtualizacao: formatarData(ie.data_atualizacao || ie.data_situacao || resJson.data_situacao_cadastral)
+    }));
   }
 
-  if (inscricoes.length === 0 || socios.length === 0 || !data) {
-    try {
-      const resCnpjWs = await fetch(`https://publica.cnpj.ws/cnpj/${cnpjLimpo}`);
-      if (resCnpjWs.ok) {
-        const dataCnpjWs = await resCnpjWs.json();
-        if (!data) {
-          data = {
-            cnpj: cnpjLimpo,
-            razao_social: dataCnpjWs.razao_social,
-            nome_fantasia: dataCnpjWs.estabelecimento?.nome_fantasia,
-            data_inicio_atividade: formatarData(dataCnpjWs.estabelecimento?.data_inicio_atividade),
-            porte: dataCnpjWs.porte?.descricao,
-            descricao_situacao_cadastral: dataCnpjWs.estabelecimento?.situacao_cadastral,
-            data_situacao_cadastral: formatarData(dataCnpjWs.estabelecimento?.data_situacao_cadastral),
-            cnae_codigo: dataCnpjWs.estabelecimento?.atividade_principal?.subclasse,
-            cnae_descricao: dataCnpjWs.estabelecimento?.atividade_principal?.descricao,
-            logradouro: `${dataCnpjWs.estabelecimento?.tipo_logradouro || ''} ${dataCnpjWs.estabelecimento?.logradouro || ''}`.trim(),
-            numero: dataCnpjWs.estabelecimento?.numero,
-            cep: dataCnpjWs.estabelecimento?.cep,
-            municipio: dataCnpjWs.estabelecimento?.cidade?.nome,
-            uf: dataCnpjWs.estabelecimento?.estado?.sigla,
-            capital_social: dataCnpjWs.capital_social
-          };
-        }
-
-        if (dataCnpjWs.simples) {
-          tributario.optanteSimples = dataCnpjWs.simples.optante === 'Sim';
-          tributario.dataOpcaoSimples = formatarData(dataCnpjWs.simples.data_opcao_simples);
-          tributario.dataExclusaoSimples = formatarData(dataCnpjWs.simples.data_exclusao_simples) || 'Não aplicável';
-        }
-        if (dataCnpjWs.simei) {
-          tributario.optanteSimei = dataCnpjWs.simei.optante === 'Sim';
-          tributario.dataOpcaoSimei = formatarData(dataCnpjWs.simei.data_opcao_simei);
-          tributario.dataExclusaoSimei = formatarData(dataCnpjWs.simei.data_exclusao_simei) || 'Não aplicável';
-        }
-
-        if (inscricoes.length === 0 && dataCnpjWs.estabelecimento && dataCnpjWs.estabelecimento.inscricoes_estaduais) {
-          inscricoes = dataCnpjWs.estabelecimento.inscricoes_estaduais.map(ie => ({
-            uf: ie.estado?.sigla || dataCnpjWs.estabelecimento.estado?.sigla || 'UF',
-            ie: ie.inscricao_estadual,
-            ativo: ie.ativo === true,
-            dataAtualizacao: formatarData(ie.data_situacao_cadastral || ie.atualizado_em || dataCnpjWs.estabelecimento?.data_situacao_cadastral)
-          }));
-        }
-
-        if (socios.length === 0 && dataCnpjWs.socios && dataCnpjWs.socios.length > 0) {
-          socios = dataCnpjWs.socios.map(s => ({
-            nome: s.nome,
-            qualificacao: s.qualificacao_socio?.descricao || 'Sócio / Administrador',
-            pais: s.pais?.nome || 'Brasil',
-            faixaEtaria: s.faixa_etaria?.descricao || 'Não informada'
-          }));
-        }
-      }
-    } catch (e) {
-      console.error('Fallback CNPJ.ws indisponível.');
-    }
+  let socios = [];
+  if (resJson.qsa && resJson.qsa.length > 0) {
+    socios = resJson.qsa.map(s => ({
+      nome: s.nome_socio || s.nome,
+      qualificacao: s.qualificacao_socio || s.qualificacao || 'Sócio / Administrador',
+      pais: s.pais?.nome || s.pais || 'Brasil',
+      faixaEtaria: s.faixa_etaria || 'Não informada'
+    }));
   }
-
-  if (!data) throw new Error('Não foi possível obter dados cadastrais.');
 
   return {
     ...data,
@@ -1613,6 +1601,137 @@ async function buscarDadosCnpj(cnpjLimpo) {
   };
 }
 
+/* Normalizador de Resposta CNPJ.ws */
+function normalizarDadosCnpjWs(dataCnpjWs, cnpjLimpo) {
+  const data = {
+    cnpj: cnpjLimpo,
+    razao_social: dataCnpjWs.razao_social || dataCnpjWs.estabelecimento?.nome_fantasia || 'Não informada',
+    nome_fantasia: dataCnpjWs.estabelecimento?.nome_fantasia || 'Não informado',
+    data_inicio_atividade: formatarData(dataCnpjWs.estabelecimento?.data_inicio_atividade),
+    porte: dataCnpjWs.porte?.descricao || 'DEMAIS',
+    descricao_situacao_cadastral: (dataCnpjWs.estabelecimento?.situacao_cadastral || 'ATIVA').toUpperCase(),
+    data_situacao_cadastral: formatarData(dataCnpjWs.estabelecimento?.data_situacao_cadastral),
+    cnae_codigo: dataCnpjWs.estabelecimento?.atividade_principal?.subclasse,
+    cnae_descricao: dataCnpjWs.estabelecimento?.atividade_principal?.descricao,
+    logradouro: `${dataCnpjWs.estabelecimento?.tipo_logradouro || ''} ${dataCnpjWs.estabelecimento?.logradouro || ''}`.trim(),
+    numero: dataCnpjWs.estabelecimento?.numero || 'S/N',
+    cep: dataCnpjWs.estabelecimento?.cep || '',
+    municipio: dataCnpjWs.estabelecimento?.cidade?.nome || '',
+    uf: dataCnpjWs.estabelecimento?.estado?.sigla || '',
+    capital_social: dataCnpjWs.capital_social || 0
+  };
+
+  const tributario = {
+    optanteSimples: dataCnpjWs.simples?.optante === 'Sim' || dataCnpjWs.simples?.optante_simples === 'Sim',
+    dataOpcaoSimples: formatarData(dataCnpjWs.simples?.data_opcao_simples),
+    dataExclusaoSimples: formatarData(dataCnpjWs.simples?.data_exclusao_simples) || 'Não aplicável',
+    optanteSimei: dataCnpjWs.simei?.optante === 'Sim' || dataCnpjWs.simples?.optante_mei === 'Sim',
+    dataOpcaoSimei: formatarData(dataCnpjWs.simei?.data_opcao_simei),
+    dataExclusaoSimei: formatarData(dataCnpjWs.simei?.data_exclusao_simei) || 'Não aplicável'
+  };
+
+  let inscricoes = [];
+  if (dataCnpjWs.estabelecimento?.inscricoes_estaduais) {
+    inscricoes = dataCnpjWs.estabelecimento.inscricoes_estaduais.map(ie => ({
+      uf: ie.estado?.sigla || dataCnpjWs.estabelecimento.estado?.sigla || 'UF',
+      ie: ie.inscricao_estadual,
+      ativo: ie.ativo === true,
+      dataAtualizacao: formatarData(ie.data_situacao_cadastral || ie.atualizado_em || dataCnpjWs.estabelecimento?.data_situacao_cadastral)
+    }));
+  }
+
+  let socios = [];
+  if (dataCnpjWs.socios && dataCnpjWs.socios.length > 0) {
+    socios = dataCnpjWs.socios.map(s => ({
+      nome: s.nome,
+      qualificacao: s.qualificacao_socio?.descricao || 'Sócio / Administrador',
+      pais: s.pais?.nome || 'Brasil',
+      faixaEtaria: s.faixa_etaria?.descricao || 'Não informada'
+    }));
+  }
+
+  return {
+    ...data,
+    cnpjFormatado: cnpjLimpo.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'),
+    tributario,
+    inscricoes,
+    socios
+  };
+}
+
+/* Core de Consulta Multi-Provider com Fallback Inteligente */
+async function buscarDadosCnpj(cnpjLimpo, onProvider = null) {
+  // 0. Cache Local
+  const doCache = obterCnpjCache(cnpjLimpo);
+  if (doCache) {
+    if (onProvider) onProvider('Cache');
+    return { ...doCache, _doCache: true };
+  }
+
+  // 1. Provedor Primário: BrasilAPI
+  try {
+    if (onProvider) onProvider('BrasilAPI');
+    const res = await fetchComTimeout(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`, {}, 7000);
+    if (res.ok) {
+      const json = await res.json();
+      const resultado = normalizarDadosMinhaReceitaOuBrasilApi(json, cnpjLimpo);
+      salvarCnpjCache(cnpjLimpo, resultado);
+      return resultado;
+    }
+  } catch (err) {
+    console.warn(`BrasilAPI falhou para ${cnpjLimpo}:`, err.message);
+  }
+
+  // 2. Provedor Secundário: MinhaReceita (Base aberta ultra rápida)
+  try {
+    if (onProvider) onProvider('MinhaReceita');
+    const res = await fetchComTimeout(`https://minhareceita.org/${cnpjLimpo}`, {}, 7000);
+    if (res.ok) {
+      const json = await res.json();
+      const resultado = normalizarDadosMinhaReceitaOuBrasilApi(json, cnpjLimpo);
+      salvarCnpjCache(cnpjLimpo, resultado);
+      return resultado;
+    }
+  } catch (err) {
+    console.warn(`MinhaReceita falhou para ${cnpjLimpo}:`, err.message);
+  }
+
+  // 3. Provedor Terciário: CNPJ.ws (Fallback de contingência)
+  try {
+    if (onProvider) onProvider('CNPJ.ws');
+    const res = await fetchComTimeout(`https://publica.cnpj.ws/cnpj/${cnpjLimpo}`, {}, 8000);
+    if (res.ok) {
+      const json = await res.json();
+      const resultado = normalizarDadosCnpjWs(json, cnpjLimpo);
+      salvarCnpjCache(cnpjLimpo, resultado);
+      return resultado;
+    }
+  } catch (err) {
+    console.warn(`CNPJ.ws falhou para ${cnpjLimpo}:`, err.message);
+  }
+
+  throw new Error('Não foi possível obter dados cadastrais deste CNPJ.');
+}
+
+/* Busca com Retry e Backoff Exponencial */
+async function buscarDadosCnpjComRetry(cnpjLimpo, maxTentativas = 2, onStatus = null) {
+  for (let tentativa = 1; tentativa <= maxTentativas; tentativa++) {
+    try {
+      const data = await buscarDadosCnpj(cnpjLimpo, (prov) => {
+        if (onStatus) onStatus(`Buscando via ${prov}...`);
+      });
+      return data;
+    } catch (err) {
+      if (tentativa < maxTentativas) {
+        if (onStatus) onStatus(`Aguardando retry (${tentativa}/${maxTentativas})...`);
+        await delay(2500);
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 /* Execução Consulta Individual */
 async function executarConsulta(cnpjLimpo) {
   document.getElementById('loading').style.display = 'block';
@@ -1620,7 +1739,7 @@ async function executarConsulta(cnpjLimpo) {
   document.getElementById('erro').style.display = 'none';
 
   try {
-    dadosAtivos = await buscarDadosCnpj(cnpjLimpo);
+    dadosAtivos = await buscarDadosCnpjComRetry(cnpjLimpo, 2);
     salvarNoHistorico(cnpjLimpo, dadosAtivos.razao_social);
 
     document.getElementById('loading').style.display = 'none';
@@ -1675,7 +1794,7 @@ async function executarConsulta(cnpjLimpo) {
       riskTags.appendChild(span);
     });
 
-    // Seção 01
+    // Seção 01: Identificação
     document.getElementById('resCnpj').innerText = dadosAtivos.cnpjFormatado;
     document.getElementById('resAbertura').innerText = dadosAtivos.data_inicio_atividade || 'Não informada';
     document.getElementById('resRazaoSocial').innerText = dadosAtivos.razao_social || 'Não informada';
@@ -1706,7 +1825,7 @@ async function executarConsulta(cnpjLimpo) {
     let capitalValor = parseFloat(dadosAtivos.capital_social) || 0;
     document.getElementById('resCapital').innerText = capitalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    // Seção 02
+    // Seção 02: Tributação
     const elSimplesStatus = document.getElementById('resSimplesStatus');
     elSimplesStatus.innerText = dadosAtivos.tributario.optanteSimples ? 'OPTANTE' : 'NÃO OPTANTE';
     elSimplesStatus.className = `status-pill ${dadosAtivos.tributario.optanteSimples ? 'active' : 'inactive'}`;
@@ -1719,7 +1838,7 @@ async function executarConsulta(cnpjLimpo) {
     document.getElementById('resSimeiData').innerText = dadosAtivos.tributario.dataOpcaoSimei;
     document.getElementById('resSimeiExclusao').innerText = dadosAtivos.tributario.dataExclusaoSimei;
 
-    // Seção 03
+    // Seção 03: Inscrições Estaduais
     const listaIEDiv = document.getElementById('listaIE');
     listaIEDiv.innerHTML = '';
 
@@ -1760,7 +1879,7 @@ async function executarConsulta(cnpjLimpo) {
       });
     }
 
-    // Seção 04
+    // Seção 04: QSA
     const listaQSADiv = document.getElementById('listaQSA');
     listaQSADiv.innerHTML = '';
 
@@ -1794,6 +1913,7 @@ async function executarConsulta(cnpjLimpo) {
     }
 
     document.getElementById('resultado').style.display = 'block';
+    inicializarAdSense();
 
   } catch (error) {
     document.getElementById('loading').style.display = 'none';
@@ -1863,10 +1983,13 @@ function mostrarErro(mensagem) {
   erroDiv.style.display = 'block';
 }
 
-/* Lógica de Processamento em Lote (CSV) */
+/* ==========================================================================
+   PROCESSAMENTO EM LOTE INTELIGENTE (CSV / TXT)
+   ========================================================================== */
 const dropArea = document.getElementById('dropArea');
 const csvFileInput = document.getElementById('csvFileInput');
 const btnProcessBatch = document.getElementById('btnProcessBatch');
+const btnCancelBatch = document.getElementById('btnCancelBatch');
 const btnExportBatch = document.getElementById('btnExportBatch');
 const batchProgress = document.getElementById('batchProgress');
 const batchProgressBar = document.getElementById('batchProgressBar');
@@ -1874,6 +1997,11 @@ const batchProgressText = document.getElementById('batchProgressText');
 const batchProgressPercent = document.getElementById('batchProgressPercent');
 const batchTableWrap = document.getElementById('batchTableWrap');
 const batchTableBody = document.getElementById('batchTableBody');
+const batchSummaryStats = document.getElementById('batchSummaryStats');
+const statTotal = document.getElementById('statTotal');
+const statSuccess = document.getElementById('statSuccess');
+const statErrors = document.getElementById('statErrors');
+const statCached = document.getElementById('statCached');
 
 dropArea.addEventListener('click', () => csvFileInput.click());
 
@@ -1925,22 +2053,66 @@ function processarArquivoCSV(file) {
     dropArea.querySelector('p').innerText = `Arquivo carregado: ${batchCnpjs.length} CNPJ(s) localizados.`;
     btnProcessBatch.style.display = 'inline-block';
     btnProcessBatch.disabled = false;
+    if (btnCancelBatch) btnCancelBatch.style.display = 'none';
     btnExportBatch.style.display = 'none';
     batchTableWrap.style.display = 'none';
+    if (batchSummaryStats) batchSummaryStats.style.display = 'none';
   };
   reader.readAsText(file);
 }
 
+if (btnCancelBatch) {
+  btnCancelBatch.addEventListener('click', () => {
+    if (isBatchRunning) {
+      batchCancelRequested = true;
+      btnCancelBatch.disabled = true;
+      btnCancelBatch.innerHTML = '<span>⏳</span> <span>Cancelando...</span>';
+    }
+  });
+}
+
 btnProcessBatch.addEventListener('click', async function() {
+  if (batchCnpjs.length === 0) return;
+
+  isBatchRunning = true;
+  batchCancelRequested = false;
   btnProcessBatch.disabled = true;
+  if (btnCancelBatch) {
+    btnCancelBatch.style.display = 'inline-flex';
+    btnCancelBatch.disabled = false;
+    btnCancelBatch.innerHTML = '<span>⏹</span> <span>Cancelar Consulta</span>';
+  }
+  btnExportBatch.style.display = 'none';
+
   batchResultados = [];
   batchTableBody.innerHTML = '';
   batchTableWrap.style.display = 'block';
   batchProgress.style.display = 'block';
+  if (batchSummaryStats) batchSummaryStats.style.display = 'flex';
 
   const total = batchCnpjs.length;
+  let countSuccess = 0;
+  let countErrors = 0;
+  let countCached = 0;
+
+  statTotal.innerText = total;
+  statSuccess.innerText = '0';
+  statErrors.innerText = '0';
+  statCached.innerText = '0';
+
+  if (typeof gtag === 'function') {
+    gtag('event', 'processamento_lote', {
+      'event_category': 'engajamento',
+      'value': total
+    });
+  }
 
   for (let i = 0; i < total; i++) {
+    if (batchCancelRequested) {
+      batchProgressText.innerText = `Processamento cancelado pelo usuário (${i} de ${total} consultados).`;
+      break;
+    }
+
     const cnpjAtual = batchCnpjs[i];
     const pct = Math.round(((i + 1) / total) * 100);
 
@@ -1949,23 +2121,39 @@ btnProcessBatch.addEventListener('click', async function() {
     batchProgressPercent.innerText = `${pct}%`;
 
     let itemRes = null;
+    let foiDoCache = false;
 
     try {
-      const data = await buscarDadosCnpj(cnpjAtual);
+      const data = await buscarDadosCnpjComRetry(cnpjAtual, 2, (statusText) => {
+        batchProgressText.innerText = `Processando: ${i + 1} de ${total} (${cnpjAtual}) · ${statusText}`;
+      });
+
+      if (data._doCache) {
+        foiDoCache = true;
+        countCached++;
+        statCached.innerText = countCached;
+      }
+
+      countSuccess++;
+      statSuccess.innerText = countSuccess;
+
       itemRes = {
         cnpj: data.cnpjFormatado,
         razaoSocial: data.razao_social,
-        situacao: data.descricao_situacao_cadastral,
+        situacao: (data.descricao_situacao_cadastral || 'ATIVA').toUpperCase(),
         simples: data.tributario.optanteSimples ? 'SIM' : 'NÃO',
         mei: data.tributario.optanteSimei ? 'SIM' : 'NÃO',
         iePrincipal: data.inscricoes.length > 0 ? data.inscricoes[0].ie : 'Não informada',
         uf: data.uf || (data.inscricoes.length > 0 ? data.inscricoes[0].uf : '--')
       };
     } catch (err) {
+      countErrors++;
+      statErrors.innerText = countErrors;
+
       itemRes = {
         cnpj: cnpjAtual.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'),
-        razaoSocial: 'Falha na consulta',
-        situacao: 'ERRO / NÃO ENCONTRADO',
+        razaoSocial: 'Falha na consulta (Limite/Indisponível)',
+        situacao: 'ERRO / NÃO LOCALIZADO',
         simples: '--',
         mei: '--',
         iePrincipal: '--',
@@ -1976,10 +2164,14 @@ btnProcessBatch.addEventListener('click', async function() {
     batchResultados.push(itemRes);
 
     const tr = document.createElement('tr');
+    const isAtiva = itemRes.situacao === 'ATIVA';
+    const isErro = itemRes.situacao.includes('ERRO');
+    const statusClass = isAtiva ? 'active' : (isErro ? 'inactive' : 'warning');
+
     tr.innerHTML = `
       <td class="mono">${itemRes.cnpj}</td>
       <td>${itemRes.razaoSocial}</td>
-      <td><span class="status-pill ${itemRes.situacao === 'ATIVA' ? 'active' : 'inactive'}">${itemRes.situacao}</span></td>
+      <td><span class="status-pill ${statusClass}">${itemRes.situacao}</span></td>
       <td>${itemRes.simples}</td>
       <td>${itemRes.mei}</td>
       <td class="mono">${itemRes.iePrincipal}</td>
@@ -1987,10 +2179,19 @@ btnProcessBatch.addEventListener('click', async function() {
     `;
     batchTableBody.appendChild(tr);
 
-    if (i < total - 1) await delay(600);
+    // Se a consulta foi na rede (não estava no cache), aplica intervalo seguro de 1800ms
+    if (!foiDoCache && i < total - 1 && !batchCancelRequested) {
+      await delay(1800);
+    }
   }
 
-  batchProgressText.innerText = `Processamento concluído: ${total} empresas consultadas.`;
+  isBatchRunning = false;
+  btnProcessBatch.disabled = false;
+  if (btnCancelBatch) btnCancelBatch.style.display = 'none';
+
+  if (!batchCancelRequested) {
+    batchProgressText.innerText = `Processamento concluído: ${batchResultados.length} empresas processadas.`;
+  }
   btnExportBatch.style.display = 'inline-flex';
 });
 
@@ -2019,8 +2220,41 @@ btnExportBatch.addEventListener('click', function() {
   document.body.removeChild(link);
 });
 
-// Inicialização
+/* ==========================================================================
+   INICIALIZAÇÃO SEGURA DO GOOGLE ADSENSE
+   - Valida IDs numéricos (evita 400 Bad Request em placeholders SLOT_...)
+   - Valida largura disponível > 0 (evita Uncaught TagError availableWidth=0)
+   ========================================================================== */
+function inicializarAdSense() {
+  try {
+    const slots = document.querySelectorAll('ins.adsbygoogle');
+    slots.forEach(slot => {
+      if (slot.getAttribute('data-adsbygoogle-status')) return;
+
+      const slotId = slot.getAttribute('data-ad-slot');
+      const ehNumerico = slotId && /^\d{8,}$/.test(slotId.trim());
+      const estaVisivel = slot.offsetWidth > 0 && slot.offsetHeight > 0;
+
+      if (ehNumerico && estaVisivel) {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      }
+    });
+  } catch (err) {
+    // AdSense protegido contra erros no console
+  }
+}
+
+// Inicialização Geral
 renderizarHistorico();
+window.addEventListener('DOMContentLoaded', () => {
+  inicializarAdSense();
+});
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(inicializarAdSense, 300);
+});
 </script>
 </body>
 </html>
