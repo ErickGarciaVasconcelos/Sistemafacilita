@@ -11,7 +11,6 @@
   gtag('config', 'G-PR46EM165J');
 </script>
 
-<meta name="google-adsense-account" content="ca-pub-6168313885664825">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SIBADE — Consulta Integrada de Cadastro</title>
@@ -20,9 +19,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-
-<!-- GOOGLE ADSENSE: Substitua ca-pub-6168313885664825 pelo seu ID -->
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6168313885664825" crossorigin="anonymous"></script>
 
 <style>
   :root {
@@ -56,7 +52,7 @@
 }
 
 /* Sombra suave aos cards para criar profundidade */
-.dossier-card, .search-panel, .ad-slot, .risk-card {
+.dossier-card, .search-panel, .risk-card {
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
 }
 
@@ -138,32 +134,7 @@
     margin:0.35rem 0 0;
   }
 
-  /* Containers de Anúncios */
-  .ad-slot{
-    background:var(--surface);
-    border:1px solid var(--hairline);
-    border-radius:4px;
-    padding:0.75rem 0.5rem;
-    text-align:center;
-  }
-  .ad-slot.banner-top {
-    margin: 1.5rem 0;
-  }
-  .ad-slot.sidebar-box {
-    min-height: 280px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-  }
-  .ad-slot__label{
-    display:block;
-    font-family:var(--font-mono);
-    font-size:0.62rem;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
-    color:var(--muted);
-    margin-bottom:0.5rem;
-  }
+  
 
   /* Abas de Navegação */
   .mode-nav{
@@ -701,7 +672,7 @@
   @media print {
     body { background: #ffffff !important; color: #000000 !important; }
     .app-layout { max-width: 100% !important; padding: 0 !important; display: block !important; }
-    .sidebar-left, .sidebar-right, .mode-nav, .search-panel, .action-bar, #loading, #erro, footer.note, #batchPanel, .btn-maps, #cardLinksOficiais, .ad-slot { display: none !important; }
+    .mode-nav, .search-panel, .action-bar, #loading, #erro, footer.note, #batchPanel, .btn-maps, #cardLinksOficiais { display: none !important; }
     #resultado { display: block !important; }
     .dossier-card, .risk-card { border: 1px solid #999999 !important; page-break-inside: avoid; margin-bottom: 1.5rem !important; }
     .dossier-card__head { background: #f0f0f0 !important; border-bottom: 1px solid #999999 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -722,10 +693,6 @@
       padding: 0 0.75rem 2.5rem !important;
       gap: 0 !important;
       display: block !important;
-    }
-
-    .sidebar-left, .sidebar-right {
-      display: none !important;
     }
 
     .shell {
@@ -925,31 +892,6 @@
 
 <div class="app-layout">
 
-  <!-- ==================== COLUNA LATERAL ESQUERDA ==================== -->
-  <aside class="sidebar-left">
-    <div class="ad-slot sidebar-box">
-      <span class="ad-slot__label">Publicidade</span>
-      <ins class="adsbygoogle"
-           style="display:block; height:250px;"
-           data-ad-client="ca-pub-6168313885664825"
-           data-ad-slot="SLOT_LATERAL_ESQ_1"
-           data-ad-format="rectangle"></ins>
-      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
-    </div>
-
-    <div class="sticky-ad-box">
-      <div class="ad-slot sidebar-box">
-        <span class="ad-slot__label">Publicidade</span>
-        <ins class="adsbygoogle"
-             style="display:block; height:600px;"
-             data-ad-client="ca-pub-6168313885664825"
-             data-ad-slot="SLOT_LATERAL_ESQ_2"
-             data-ad-format="vertical"></ins>
-      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
-      </div>
-    </div>
-  </aside>
-
   <!-- ==================== CONTEÚDO CENTRAL ==================== -->
   <main class="shell">
 
@@ -966,18 +908,6 @@
         </div>
       </div>
     </header>
-
-    <!-- BLOCO DE ANÚNCIO 01: Topo Responsivo -->
-    <div class="ad-slot banner-top">
-      <span class="ad-slot__label">Publicidade</span>
-      <ins class="adsbygoogle"
-           style="display:block; min-height:90px;"
-           data-ad-client="ca-pub-6168313885664825"
-           data-ad-slot="SLOT_TOPO_PRINCIPAL"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
-      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
-    </div>
 
     <nav class="mode-nav">
       <button type="button" class="tab-btn active" id="tabSingle">Consulta Individual</button>
@@ -1215,16 +1145,6 @@
         </article>
 
         <!-- BLOCO DE ANÚNCIO: Pós-Dossiê -->
-        <div class="ad-slot">
-          <span class="ad-slot__label">Publicidade</span>
-          <ins class="adsbygoogle"
-               style="display:block; min-height:90px;"
-               data-ad-client="ca-pub-6168313885664825"
-               data-ad-slot="SLOT_RODAPE_DOSSIE"
-               data-ad-format="auto"
-               data-full-width-responsive="true"></ins>
-      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
-        </div>
 
       </div>
     </div>
@@ -1297,31 +1217,6 @@
 
   </main>
 
-  <!-- ==================== COLUNA LATERAL DIREITA ==================== -->
-  <aside class="sidebar-right">
-    <div class="ad-slot sidebar-box">
-      <span class="ad-slot__label">Publicidade</span>
-      <ins class="adsbygoogle"
-           style="display:block; height:250px;"
-           data-ad-client="ca-pub-6168313885664825"
-           data-ad-slot="SLOT_LATERAL_DIR_1"
-           data-ad-format="rectangle"></ins>
-      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
-    </div>
-
-    <div class="sticky-ad-box">
-      <div class="ad-slot sidebar-box">
-        <span class="ad-slot__label">Publicidade</span>
-        <ins class="adsbygoogle"
-             style="display:block; height:600px;"
-             data-ad-client="ca-pub-6168313885664825"
-             data-ad-slot="SLOT_LATERAL_DIR_2"
-             data-ad-format="vertical"></ins>
-      <!-- AdSense inicializado com proteção automática via inicializarAdSense() -->
-      </div>
-    </div>
-  </aside>
-
 </div>
 
 <script>
@@ -1382,7 +1277,6 @@ tabSingle.addEventListener('click', () => {
   tabBatch.classList.remove('active');
   singlePanel.style.display = 'block';
   batchPanel.style.display = 'none';
-  inicializarAdSense();
 });
 
 tabBatch.addEventListener('click', () => {
@@ -1390,7 +1284,6 @@ tabBatch.addEventListener('click', () => {
   tabSingle.classList.remove('active');
   singlePanel.style.display = 'none';
   batchPanel.style.display = 'block';
-  inicializarAdSense();
 });
 
 /* Funções Utilitárias */
@@ -1923,7 +1816,6 @@ async function executarConsulta(cnpjLimpo) {
     }
 
     document.getElementById('resultado').style.display = 'block';
-    inicializarAdSense();
 
   } catch (error) {
     document.getElementById('loading').style.display = 'none';
@@ -2230,41 +2122,6 @@ btnExportBatch.addEventListener('click', function() {
   document.body.removeChild(link);
 });
 
-/* ==========================================================================
-   INICIALIZAÇÃO SEGURA DO GOOGLE ADSENSE
-   - Valida IDs numéricos (evita 400 Bad Request em placeholders SLOT_...)
-   - Valida largura disponível > 0 (evita Uncaught TagError availableWidth=0)
-   ========================================================================== */
-function inicializarAdSense() {
-  try {
-    const slots = document.querySelectorAll('ins.adsbygoogle');
-    slots.forEach(slot => {
-      if (slot.getAttribute('data-adsbygoogle-status')) return;
-
-      const slotId = slot.getAttribute('data-ad-slot');
-      const ehNumerico = slotId && /^\d{8,}$/.test(slotId.trim());
-      const estaVisivel = slot.offsetWidth > 0 && slot.offsetHeight > 0;
-
-      if (ehNumerico && estaVisivel) {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      }
-    });
-  } catch (err) {
-    // AdSense protegido contra erros no console
-  }
-}
-
-// Inicialização Geral
-renderizarHistorico();
-window.addEventListener('DOMContentLoaded', () => {
-  inicializarAdSense();
-});
-
-let resizeTimer;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(inicializarAdSense, 300);
-});
 </script>
 </body>
 </html>
