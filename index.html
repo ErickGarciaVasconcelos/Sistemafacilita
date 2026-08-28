@@ -886,6 +886,149 @@
     }
   }
 
+
+  /* ==========================================
+     SINTEGRA / SEFAZ SMART REDIRECT & EMPTY STATE
+     ========================================== */
+  .sintegra-empty-box {
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 1.75rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+    margin: 0.5rem 0;
+  }
+
+  .sintegra-empty-box__icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--brass-soft);
+    color: var(--brass);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .sintegra-empty-box__title {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .sintegra-empty-box__desc {
+    font-size: 0.875rem;
+    color: var(--muted);
+    max-width: 580px;
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .btn-sintegra-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: #0f172a;
+    color: #ffffff !important;
+    text-decoration: none;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.75rem 1.45rem;
+    border-radius: 6px;
+    margin-top: 0.5rem;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  .btn-sintegra-action:hover {
+    background: #1e293b;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.12), 0 3px 6px -3px rgba(0, 0, 0, 0.08);
+  }
+
+  .btn-sintegra-action:active {
+    transform: translateY(0);
+  }
+
+  .sintegra-footer-box {
+    margin-top: 1rem;
+    padding: 0.85rem 1.15rem;
+    background: #f8fafc;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .sintegra-footer-box__text {
+    font-size: 0.825rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .sintegra-footer-link {
+    font-size: 0.825rem;
+    font-weight: 600;
+    color: var(--focus);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+
+  .sintegra-footer-link:hover {
+    color: var(--brass);
+    text-decoration: underline;
+  }
+
+  /* TOAST NOTIFICATION */
+  .toast-notification {
+    position: fixed;
+    bottom: 1.75rem;
+    right: 1.75rem;
+    background: #0f172a;
+    color: #ffffff;
+    padding: 0.85rem 1.35rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-family: var(--font-body);
+    font-weight: 500;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    z-index: 999999;
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .toast-notification.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
 </style>
 </head>
 <body>
@@ -1235,35 +1378,36 @@ const STORAGE_KEY = 'sibade_recent_searches';
 const CACHE_PREFIX = 'sibade_cnpj_cache_';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
-/* Tabela de URLs do Sintegra por Estado */
+/* Tabela Completa de URLs Oficiais do SINTEGRA / SEFAZ por UF */
 const SINTEGRA_URLS = {
   'AC': 'http://sintegra.sefaz.ac.gov.br/',
   'AL': 'http://sintegra.sefaz.al.gov.br/',
-  'AP': 'http://www.sefaz.ap.gov.br/sica/sintegra/',
+  'AP': 'https://sistemas.sefaz.ap.gov.br/sintegra/',
   'AM': 'http://online.sefaz.am.gov.br/sintegra/',
-  'BA': 'http://www.sefaz.ba.gov.br/sintegra/sintegra.asp',
-  'CE': 'http://sintegra.sefaz.ce.gov.br/',
-  'DF': 'http://www.fazenda.df.gov.br/area.cfm?id_area=104',
-  'ES': 'http://www.sintegra.es.gov.br/',
-  'GO': 'http://www.sefaz.go.gov.br/Sintegra/',
-  'MA': 'http://sistemas1.sefaz.ma.gov.br/sintegra/',
-  'MT': 'http://www.sefaz.mt.gov.br/sintegra/',
+  'BA': 'https://portal.sefaz.ba.gov.br/scripts/cadastro/cadastroSintegra/default.asp',
+  'CE': 'https://servicos.sefaz.ce.gov.br/internet/sintegra/sintegra.asp',
+  'DF': 'https://ww1.receita.fazenda.df.gov.br/consultar-cadastro-fiscal/',
+  'ES': 'https://sintegra.sefaz.es.gov.br/',
+  'GO': 'https://www.sefaz.go.gov.br/sintegra/',
+  'MA': 'https://sistemas1.sefaz.ma.gov.br/sintegra/',
+  'MT': 'https://www.sefaz.mt.gov.br/sintegra/',
   'MS': 'http://www.sintegra.ms.gov.br/',
-  'MG': 'http://consultasintegra.fazenda.mg.gov.br/sintegra/',
-  'PA': 'http://www.sefa.pa.gov.br/sintegra/',
-  'PB': 'https://www.sefaz.pb.gov.br/servicos/consultas/sintegra',
-  'PR': 'http://www.fazenda.pr.gov.br/modules/conteudo/conteudo.php?conteudo=240',
-  'PE': 'http://efisco.sefaz.pe.gov.br/sfi_trb_cct/dynamic/public/sfi_trb_cct/PRConsultarContribuinteSintegra.dynamic.action',
-  'PI': 'http://www.sefaz.pi.gov.br/sintegra/',
-  'RJ': 'http://www.fazenda.rj.gov.br/projeto_sintegra/',
-  'RN': 'http://www.set.rn.gov.br/uvt/sintegra.aspx',
-  'RS': 'http://www.sefaz.rs.gov.br/NFE/NFE-CCC.aspx',
-  'RO': 'http://www.sefin.ro.gov.br/sintegra/',
-  'RR': 'http://www.sefaz.rr.gov.br/sintegra/',
-  'SC': 'http://sistemas4.sef.sc.gov.br/sintegra/consulta_empresa_pesquisa.aspx',
+  'MG': 'https://dfe-portal.fazenda.mg.gov.br/consultas/publica/sintegra/',
+  'PA': 'https://app.sefa.pa.gov.br/sintegra/',
+  'PB': 'https://www.sefaz.pb.gov.br/sintegra',
+  'PR': 'http://www.sintegra.pr.gov.br/sintegra/',
+  'PE': 'https://efisco.sefaz.pe.gov.br/',
+  'PI': 'https://web.sefaz.pi.gov.br/sintegra/',
+  'RJ': 'http://www.fazenda.rj.gov.br/sintegra/',
+  'RN': 'https://uvt.set.rn.gov.br/#/services/consultar-situacao-cadastral',
+  'RS': 'https://www.sefaz.rs.gov.br/cadastro/cad_consulta.aspx',
+  'RO': 'https://www.sefin.ro.gov.br/sintegra/',
+  'RR': 'https://sintegra.sefaz.rr.gov.br/',
+  'SC': 'https://sistemas.sef.sc.gov.br/sintegra/consulta_empresa_pesquisa.aspx',
   'SP': 'https://www.cadesp.fazenda.sp.gov.br/',
-  'SE': 'http://www.sefaz.se.gov.br/Sintegra/',
-  'TO': 'http://sintegra.sefaz.to.gov.br/'
+  'SE': 'https://security.sefaz.se.gov.br/sintegra/',
+  'TO': 'http://sintegra.sefaz.to.gov.br/',
+  'PADRAO': 'http://www.sintegra.gov.br/'
 };
 
 /* Alternância de Abas */
@@ -1974,6 +2118,107 @@ async function buscarDadosCnpjComRetry(cnpjLimpo, maxTentativas = 2, onStatus = 
 }
 
 /* Execução Consulta Individual */
+/* Helper de Notificação Toast */
+let toastTimeout = null;
+function showToast(mensagem, duracao = 3500) {
+  const toast = document.getElementById('toastNotification');
+  if (!toast) return;
+  toast.innerHTML = mensagem;
+  toast.classList.add('is-visible');
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    toast.classList.remove('is-visible');
+  }, duracao);
+}
+
+/* Copia CNPJ para transferência ao abrir SINTEGRA */
+function copiarCnpjParaSintegra(cnpj, uf) {
+  const cnpjLimpo = String(cnpj || '').replace(/\D/g, '');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(cnpjLimpo).then(() => {
+      showToast(`📋 <strong>CNPJ (${cnpjLimpo}) copiado!</strong> Cole no portal da SEFAZ/${uf || 'UF'}.`, 4000);
+    }).catch(() => {
+      showToast(`Acesse a SEFAZ para consultar a IE.`, 3000);
+    });
+  }
+}
+
+/* Renderizador Dedicado da Seção 03: Inscrições Estaduais & SINTEGRA */
+function renderizarSecaoInscricoes(inscricoes, uf, cnpjFormatado, cnpjLimpo) {
+  const listaIEDiv = document.getElementById('listaIE');
+  if (!listaIEDiv) return;
+  listaIEDiv.innerHTML = '';
+
+  const ufDestino = (uf || 'PADRAO').toUpperCase();
+  const urlSintegra = SINTEGRA_URLS[ufDestino] || SINTEGRA_URLS['PADRAO'];
+
+  if (!inscricoes || inscricoes.length === 0) {
+    // Estado Vazio com CTA Inteligente e Cópia de CNPJ
+    const emptyBox = document.createElement('div');
+    emptyBox.className = 'sintegra-empty-box';
+    emptyBox.innerHTML = `
+      <div class="sintegra-empty-box__icon">🔍</div>
+      <h3 class="sintegra-empty-box__title">Nenhuma Inscrição Estadual ativa encontrada nas bases abertas</h3>
+      <p class="sintegra-empty-box__desc">
+        Inscrições com status suspenso, baixado, isenção de IE ou alterações cadastrais recentes podem não constar nas APIs públicas gratuitas e exigem verificação direta no fisco estadual.
+      </p>
+      <a href="${urlSintegra}" target="_blank" rel="noopener noreferrer" class="btn-sintegra-action" onclick="copiarCnpjParaSintegra('${cnpjLimpo}', '${ufDestino}')">
+        <span>🔍 Consultar no SINTEGRA / SEFAZ (${ufDestino})</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+      </a>
+    `;
+    listaIEDiv.appendChild(emptyBox);
+  } else {
+    // Renderiza cada IE encontrada
+    inscricoes.forEach(ie => {
+      const isAtivo = ie.ativo === true;
+      const statusClass = isAtivo ? 'active' : 'inactive';
+      const statusTexto = isAtivo ? 'Habilitada / Ativa' : 'Inativa / Suspensa';
+
+      const ficha = document.createElement('div');
+      ficha.className = 'ficha';
+      ficha.innerHTML = `
+        <div class="ficha__tab">${ie.uf || ufDestino}</div>
+        <div class="ficha__body">
+          <div class="ficha__top">
+            <span style="font-size:0.8rem; color:var(--muted);">Cadastro ICMS Estadual</span>
+            <span style="font-family:var(--font-mono); font-weight:600;">IE: ${ie.ie}</span>
+          </div>
+          <div class="ficha-grid">
+            <div>
+              <label>Situação Cadastral</label>
+              <span class="status-pill ${statusClass}">${statusTexto}</span>
+            </div>
+            <div>
+              <label>Última Atualização</label>
+              <span class="value is-mono">${ie.dataAtualizacao || 'Não informada'}</span>
+            </div>
+            <div>
+              <label>Estado (UF)</label>
+              <span class="value is-mono">${ie.uf || ufDestino}</span>
+            </div>
+          </div>
+        </div>
+      `;
+      listaIEDiv.appendChild(ficha);
+    });
+
+    // Rodapé de Auditoria e Redirecionamento Complementar
+    const footerBox = document.createElement('div');
+    footerBox.className = 'sintegra-footer-box';
+    footerBox.innerHTML = `
+      <div class="sintegra-footer-box__text">
+        <span>💡</span>
+        <span>Deseja emitir o Comprovante Oficial ou checar divergências de IE?</span>
+      </div>
+      <a href="${urlSintegra}" target="_blank" rel="noopener noreferrer" class="sintegra-footer-link" onclick="copiarCnpjParaSintegra('${cnpjLimpo}', '${ufDestino}')">
+        Checar no SINTEGRA oficial de ${ufDestino} ↗
+      </a>
+    `;
+    listaIEDiv.appendChild(footerBox);
+  }
+}
+
 async function executarConsulta(cnpjLimpo) {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('resultado').style.display = 'none';
@@ -2461,5 +2706,8 @@ btnExportBatch.addEventListener('click', function() {
 });
 
 </script>
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastNotification" class="toast-notification" aria-live="polite"></div>
+
 </body>
 </html>
