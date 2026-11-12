@@ -1086,6 +1086,9 @@
 
       <div id="resultado">
         <div class="action-bar">
+          <button type="button" id="btnForcarAtualizacao" class="btn-action" title="Ignorar cache local e reconsultar todas as bases em tempo real">
+            <span>🔄</span> <span id="btnForcarAtualizacaoTexto">Atualizar Dados (Ignorar Cache)</span>
+          </button>
           <a id="btnGoogleMapsAction" href="#" target="_blank" rel="noopener noreferrer" class="btn-action" title="Abrir localização no Google Maps">
             <span>📍</span> <span>Ver no Google Maps</span>
           </a>
@@ -1104,6 +1107,7 @@
             <span id="riskOverallStatus" class="status-pill active">REGULAR</span>
           </div>
           <div class="risk-tags" id="riskTags"></div>
+          <div id="provenanceBar" style="margin-top:0.75rem; padding-top:0.6rem; border-top:1px dashed var(--hairline); font-family:var(--font-mono); font-size:0.72rem; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;"></div>
         </div>
 
         <!-- SEÇÃO 01: CNPJ -->
@@ -1554,12 +1558,19 @@ document.getElementById('btnClearHistory').addEventListener('click', () => {
 /* ==========================================================================
    CACHE LOCAL DE DADOS DE CNPJ (Evita requisições repetidas e economiza cota)
    ========================================================================== */
+const CACHE_SCHEMA_VERSION = 3; // Invalida caches antigos que salvaram IEs vazias ou timestamps incorretos
+
 function obterCnpjCache(cnpjLimpo) {
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + cnpjLimpo);
     if (!raw) return null;
     const item = JSON.parse(raw);
-    if (Date.now() - (item.timestamp || 0) < CACHE_TTL_MS && item.data) {
+    if (
+      item.version === CACHE_SCHEMA_VERSION &&
+      Date.now() - (item.timestamp || 0) < CACHE_TTL_MS &&
+      item.data &&
+      !item.data._iePendente
+    ) {
       return item.data;
     }
     localStorage.removeItem(CACHE_PREFIX + cnpjLimpo);
@@ -1569,10 +1580,19 @@ function obterCnpjCache(cnpjLimpo) {
 
 function salvarCnpjCache(cnpjLimpo, data) {
   try {
+    // Nunca congela por 7 dias uma resposta em que a fonte de Sintegra (CNPJ.ws) sofreu rate-limit (429)
+    if (data && data._iePendente) return;
     localStorage.setItem(CACHE_PREFIX + cnpjLimpo, JSON.stringify({
+      version: CACHE_SCHEMA_VERSION,
       timestamp: Date.now(),
       data: data
     }));
+  } catch (e) {}
+}
+
+function removerCnpjCache(cnpjLimpo) {
+  try {
+    localStorage.removeItem(CACHE_PREFIX + cnpjLimpo);
   } catch (e) {}
 }
 
@@ -1591,7 +1611,8 @@ async function fetchComTimeout(url, options = {}, timeoutMs = 8000) {
 }
 
 /* ==========================================================================
-   CAMADA DE CONSULTA PARALELA COM SMART MERGE (DATA ENRICHMENT)
+   CAMADA DE CONSULTA PARALELA COM SMART MERGE (5 FONTES + SINTEGRA)
+   Fontes: CNPJa Open, CNPJ.ws (Sintegra/CCC), LocalizaCNPJ, BrasilAPI, ReceitaWS/MinhaReceita
    ========================================================================== */
 
 /* Helper para formatar data DD/MM/AAAA */
@@ -1619,34 +1640,53 @@ function formatarData(dataRaw) {
   return str;
 }
 
-/* Extrai timestamp numérico confiável da data de atualização da base */
-function extrairTimestamp(dado) {
-  if (!dado) return 0;
-  const dataStr = dado.atualizado_em || dado.ultima_atualizacao || dado.data_atualizacao;
-  if (dataStr) {
-    const d = new Date(dataStr);
-    if (!isNaN(d.getTime())) return d.getTime();
+/* Converte qualquer data (DD/MM/AAAA ou ISO AAAA-MM-DD...) para timestamp numérico confiável */
+function parseDataBrOuIso(valor) {
+  if (!valor || valor === 'Não informada' || valor === 'Não aplicável') return 0;
+  const str = String(valor).trim();
+  const mBr = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (mBr) {
+    const t = Date.UTC(parseInt(mBr[3], 10), parseInt(mBr[2], 10) - 1, parseInt(mBr[1], 10));
+    return isNaN(t) ? 0 : t;
   }
-  if (dado.data_situacao_cadastral) {
-    const d = new Date(dado.data_situacao_cadastral);
-    if (!isNaN(d.getTime())) return d.getTime();
+  const mIso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (mIso && str.length === 10) {
+    const t = Date.UTC(parseInt(mIso[1], 10), parseInt(mIso[2], 10) - 1, parseInt(mIso[3], 10));
+    return isNaN(t) ? 0 : t;
   }
-  return 0;
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
-/* Timeout Wrapper com AbortController */
-async function fetchComTimeout(url, options = {}, timeoutMs = 8000) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(timeoutId);
-    return res;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    throw err;
+/* Extrai o maior timestamp de eventos cadastrais reais dentro do registro (situação, sócios, simples, IE) */
+function extrairMaiorEventoCadastral(dado) {
+  if (!dado) return 0;
+  const candidatos = [
+    parseDataBrOuIso(dado.data_situacao_cadastral),
+    parseDataBrOuIso(dado.tributario?.dataOpcaoSimples),
+    parseDataBrOuIso(dado.tributario?.dataExclusaoSimples),
+    parseDataBrOuIso(dado.tributario?.dataOpcaoSimei),
+    parseDataBrOuIso(dado.tributario?.dataExclusaoSimei)
+  ];
+  if (Array.isArray(dado.qsa)) {
+    dado.qsa.forEach(s => {
+      if (s.desde) candidatos.push(parseDataBrOuIso(s.desde));
+    });
   }
+  if (Array.isArray(dado.inscricoes)) {
+    dado.inscricoes.forEach(ie => {
+      if (ie.dataAtualizacao) candidatos.push(parseDataBrOuIso(ie.dataAtualizacao));
+    });
+  }
+  return Math.max(0, ...candidatos);
+}
+
+/* Extrai timestamp numérico confiável de atualização da base (sem usar datas falsas) */
+function extrairTimestamp(dado) {
+  if (!dado) return 0;
+  const tsSincronizacao = parseDataBrOuIso(dado.atualizado_em);
+  const tsEvento = extrairMaiorEventoCadastral(dado);
+  return Math.max(tsSincronizacao, tsEvento);
 }
 
 /* Fallback JSONP para ReceitaWS em navegadores (supera restrições de CORS) */
@@ -1695,7 +1735,188 @@ function fetchReceitaWsJsonp(cnpjLimpo, timeoutMs = 7000) {
   });
 }
 
-/* Adaptador 1: BrasilAPI */
+/* Adaptador 1: CNPJa Open (Base sincronizada diariamente + Simples + SIMEI + QSA com datas) */
+async function consultarCnpjaOpen(cnpjLimpo) {
+  const url = `https://open.cnpja.com/office/${cnpjLimpo}`;
+  const res = await fetchComTimeout(url, {}, 7500);
+  if (!res.ok) throw new Error(`CNPJa HTTP ${res.status}`);
+  const json = await res.json();
+  if (!json || !json.taxId) throw new Error('CNPJa retornou resposta inválida');
+
+  const comp = json.company || {};
+  const addr = json.address || {};
+  const cnaeCod = json.mainActivity?.id ? String(json.mainActivity.id) : '';
+  const cnaeDesc = json.mainActivity?.text || 'Não informado';
+
+  const inscricoes = (json.registrations || []).map(ie => ({
+    ie: String(ie.number || '').trim(),
+    uf: (ie.state || addr.state || 'UF').toUpperCase(),
+    ativo: ie.enabled === true,
+    status: ie.status?.text || (ie.enabled === true ? 'Habilitada / Ativa' : 'Inativa / Suspensa'),
+    dataAtualizacao: formatarData(ie.statusDate || json.updated)
+  })).filter(i => i.ie);
+
+  const qsa = (comp.members || []).map(m => ({
+    nome: m.person?.name || 'Não informado',
+    qualificacao: m.role?.text || 'Sócio / Administrador',
+    pais: m.person?.country?.name || 'Brasil',
+    faixaEtaria: m.person?.age ? `${m.person.age} anos` : 'Não informada',
+    desde: formatarData(m.since)
+  }));
+
+  const cnaesSecundarios = (json.sideActivities || []).map(c => ({
+    codigo: String(c.id || ''),
+    texto: c.text || ''
+  }));
+
+  const tributario = {
+    optanteSimples: comp.simples?.optant === true,
+    dataOpcaoSimples: formatarData(comp.simples?.since),
+    dataExclusaoSimples: 'Não aplicável',
+    optanteSimei: comp.simei?.optant === true,
+    dataOpcaoSimei: formatarData(comp.simei?.since),
+    dataExclusaoSimei: 'Não aplicável'
+  };
+
+  return {
+    cnpj: cnpjLimpo,
+    cnpjFormatado: cnpjLimpo.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'),
+    razao_social: comp.name || json.alias || 'Não informada',
+    nome_fantasia: json.alias || 'Não informado',
+    situacao_cadastral: (json.status?.text || 'ATIVA').toUpperCase(),
+    descricao_situacao_cadastral: (json.status?.text || 'ATIVA').toUpperCase(),
+    data_situacao_cadastral: formatarData(json.statusDate),
+    data_abertura: formatarData(json.founded),
+    data_inicio_atividade: formatarData(json.founded),
+    natureza_juridica: comp.nature?.text ? `${comp.nature.id || ''} - ${comp.nature.text}`.replace(/^ - /, '') : 'Não informada',
+    capital_social: parseFloat(comp.equity) || 0,
+    porte: comp.size?.text || comp.size?.acronym || 'DEMAIS',
+
+    logradouro: addr.street || '',
+    numero: addr.number || 'S/N',
+    complemento: addr.details || '',
+    bairro: addr.district || '',
+    cep: addr.zip || '',
+    municipio: addr.city || '',
+    uf: (addr.state || '').toUpperCase(),
+
+    cnae_principal: { codigo: cnaeCod, texto: cnaeDesc },
+    cnae_codigo: cnaeCod,
+    cnae_descricao: cnaeDesc,
+    cnaes_secundarios: cnaesSecundarios,
+
+    tributario,
+    inscricoes,
+    qsa,
+    socios: qsa,
+    atualizado_em: json.updated || null,
+    _provedor: 'CNPJa'
+  };
+}
+
+/* Adaptador 2: LocalizaCNPJ (Engenharia Reversa Base44 — Sem limite de 3 req/min, QSA com datas e Simples) */
+async function consultarLocalizaCnpj(cnpjLimpo) {
+  const url = 'https://localizacnpj.com.br/api/apps/6a83b37628056fc0830e9a65/functions/consultarCnpj';
+  const res = await fetchComTimeout(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cnpj: cnpjLimpo })
+  }, 8000);
+  if (!res.ok) throw new Error(`LocalizaCNPJ HTTP ${res.status}`);
+  const json = await res.json();
+  if (!json || !json.razao_social) throw new Error(json?.error || 'LocalizaCNPJ retornou erro');
+
+  let cnaeCod = '';
+  let cnaeDesc = 'Não informado';
+  if (json.cnae_principal) {
+    const partesCnae = String(json.cnae_principal).split(' - ');
+    cnaeCod = partesCnae[0]?.trim() || '';
+    cnaeDesc = partesCnae.slice(1).join(' - ').trim() || json.cnae_principal;
+  }
+
+  // Extrai logradouro, número e bairro do endereço formatado ("LOGRADOURO NUM, COMPLEMENTO, BAIRRO, CIDADE, UF, CEP")
+  let logradouro = '';
+  let numero = 'S/N';
+  let bairro = '';
+  if (json.endereco) {
+    const partesEnd = String(json.endereco).split(',').map(p => p.trim());
+    if (partesEnd.length > 0) {
+      const mNum = partesEnd[0].match(/^(.*?)\s+(\d+[A-Za-z0-9\-\/]*|S\/N|SN)$/i);
+      if (mNum) {
+        logradouro = mNum[1].trim();
+        numero = mNum[2].trim();
+      } else {
+        logradouro = partesEnd[0];
+      }
+    }
+    if (partesEnd.length >= 3) {
+      bairro = partesEnd[partesEnd.length - 4] || '';
+    }
+  }
+
+  const qsa = (json.socios || []).map(s => ({
+    nome: s.nome || 'Não informado',
+    qualificacao: s.qualificacao || 'Sócio / Administrador',
+    pais: s.pais || 'Brasil',
+    faixaEtaria: s.faixa_etaria || 'Não informada',
+    desde: formatarData(s.desde)
+  }));
+
+  const cnaesSecundarios = (json.cnaes_secundarios || []).map(c => ({
+    codigo: String(c.codigo || ''),
+    texto: c.descricao || ''
+  }));
+
+  const simplesStr = String(json.simples_nacional || '').toLowerCase();
+  const optanteSimples = simplesStr.includes('optante') && !simplesStr.includes('não') && !simplesStr.includes('nao');
+  const optanteSimei = json.simples_info?.mei === true;
+
+  const tributario = {
+    optanteSimples,
+    dataOpcaoSimples: formatarData(json.simples_info?.data_opcao),
+    dataExclusaoSimples: formatarData(json.simples_info?.data_exclusao) || 'Não aplicável',
+    optanteSimei,
+    dataOpcaoSimei: optanteSimei ? formatarData(json.simples_info?.data_opcao) : 'Não informada',
+    dataExclusaoSimei: 'Não aplicável'
+  };
+
+  return {
+    cnpj: cnpjLimpo,
+    cnpjFormatado: json.cnpj_formatado || cnpjLimpo.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'),
+    razao_social: json.razao_social || 'Não informada',
+    nome_fantasia: json.nome_fantasia || 'Não informado',
+    situacao_cadastral: (json.situacao_cadastral || 'ATIVA').toUpperCase(),
+    descricao_situacao_cadastral: (json.situacao_cadastral || 'ATIVA').toUpperCase(),
+    data_situacao_cadastral: formatarData(json.data_situacao_cadastral),
+    data_abertura: formatarData(json.data_abertura),
+    data_inicio_atividade: formatarData(json.data_abertura),
+    natureza_juridica: json.natureza_juridica || 'Não informada',
+    capital_social: parseFloat(json.capital_social) || 0,
+    porte: (json.porte || 'DEMAIS').toUpperCase(),
+
+    logradouro,
+    numero,
+    complemento: '',
+    bairro,
+    cep: (json.cep || '').replace(/\D/g, ''),
+    municipio: json.municipio || '',
+    uf: (json.uf || '').toUpperCase(),
+
+    cnae_principal: { codigo: cnaeCod, texto: cnaeDesc },
+    cnae_codigo: cnaeCod,
+    cnae_descricao: cnaeDesc,
+    cnaes_secundarios: cnaesSecundarios,
+
+    tributario,
+    inscricoes: [],
+    qsa,
+    socios: qsa,
+    atualizado_em: null,
+    _provedor: 'LocalizaCNPJ'
+  };
+}
+
+/* Adaptador 3: BrasilAPI */
 async function consultarBrasilApi(cnpjLimpo) {
   const url = `https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`;
   const res = await fetchComTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, 7500);
@@ -1718,7 +1939,8 @@ async function consultarBrasilApi(cnpjLimpo) {
     nome: s.nome_socio || s.nome || 'Não informado',
     qualificacao: s.qualificacao_socio || s.qualificacao || 'Sócio / Administrador',
     pais: s.pais?.nome || s.pais || 'Brasil',
-    faixaEtaria: s.faixa_etaria || 'Não informada'
+    faixaEtaria: s.faixa_etaria || 'Não informada',
+    desde: formatarData(s.data_entrada_sociedade)
   }));
 
   const cnaesSecundarios = (json.cnaes_secundarios || []).map(c => ({
@@ -1766,16 +1988,20 @@ async function consultarBrasilApi(cnpjLimpo) {
     inscricoes,
     qsa,
     socios: qsa,
-    atualizado_em: json.data_situacao_cadastral || new Date().toISOString(),
+    atualizado_em: null,
     _provedor: 'BrasilAPI'
   };
 }
 
-/* Adaptador 2: CNPJ.ws */
+/* Adaptador 4: CNPJ.ws (Fonte principal de Sintegra / Inscrições Estaduais SEFAZ) */
 async function consultarCnpjWs(cnpjLimpo) {
   const url = `https://publica.cnpj.ws/cnpj/${cnpjLimpo}`;
-  const res = await fetchComTimeout(url, {}, 8000);
-  if (!res.ok) throw new Error(`CNPJ.ws HTTP ${res.status}`);
+  const res = await fetchComTimeout(url, {}, 8500);
+  if (!res.ok) {
+    const err = new Error(`CNPJ.ws HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
   const json = await res.json();
   if (!json || json.status === 400 || json.status === 404) throw new Error(json.detalhes || 'CNPJ.ws retornou erro');
 
@@ -1788,14 +2014,16 @@ async function consultarCnpjWs(cnpjLimpo) {
     uf: (ie.estado?.sigla || est.estado?.sigla || 'UF').toUpperCase(),
     ativo: ie.ativo === true,
     status: ie.ativo === true ? 'Habilitada / Ativa' : 'Inativa / Suspensa',
-    dataAtualizacao: formatarData(ie.data_situacao_cadastral || ie.atualizado_em || est.data_situacao_cadastral)
+    dataAtualizacao: formatarData(ie.atualizado_em || ie.data_situacao_cadastral || est.data_situacao_cadastral),
+    _tsAtualizacao: parseDataBrOuIso(ie.atualizado_em || ie.data_situacao_cadastral)
   })).filter(i => i.ie);
 
   const qsa = (json.socios || []).map(s => ({
     nome: s.nome || 'Não informado',
     qualificacao: s.qualificacao_socio?.descricao || 'Sócio / Administrador',
     pais: s.pais?.nome || 'Brasil',
-    faixaEtaria: s.faixa_etaria?.descricao || 'Não informada'
+    faixaEtaria: s.faixa_etaria?.descricao || 'Não informada',
+    desde: formatarData(s.data_entrada)
   }));
 
   const cnaesSecundarios = (est.atividades_secundarias || []).map(c => ({
@@ -1843,41 +2071,37 @@ async function consultarCnpjWs(cnpjLimpo) {
     inscricoes,
     qsa,
     socios: qsa,
-    atualizado_em: json.atualizado_em || est.atualizado_em || new Date().toISOString(),
+    atualizado_em: est.atualizado_em || json.atualizado_em || null,
     _provedor: 'CNPJ.ws'
   };
 }
 
-/* Adaptador 3: ReceitaWS */
+/* Adaptador 5: ReceitaWS / MinhaReceita */
 async function consultarReceitaWs(cnpjLimpo) {
   let json = null;
 
-  // Tentativa 1: Fetch direto
+  // Tentativa 1: MinhaReceita (rápida, CORS liberado e sem limite de 3 req/min)
   try {
-    const res = await fetchComTimeout(`https://www.receitaws.com.br/v1/cnpj/${cnpjLimpo}`, {}, 7000);
-    if (res.ok) {
-      json = await res.json();
-    }
-  } catch (err) {
-    // Falha de CORS ou rede -> prossegue para JSONP
-  }
-
-  // Tentativa 2: JSONP (se estiver no navegador)
-  if (!json && typeof window !== 'undefined' && typeof document !== 'undefined') {
-    try {
-      json = await fetchReceitaWsJsonp(cnpjLimpo, 7000);
-    } catch (err) {
-      // JSONP falhou
-    }
-  }
-
-  // Tentativa 3: MinhaReceita (fallback aberto ultra rápido)
-  if (!json) {
     const resMinha = await fetchComTimeout(`https://minhareceita.org/${cnpjLimpo}`, {}, 7000);
     if (resMinha.ok) {
       const minJson = await resMinha.json();
       return normalizarMinhaReceita(minJson, cnpjLimpo);
     }
+  } catch (err) {}
+
+  // Tentativa 2: Fetch direto ReceitaWS
+  try {
+    const res = await fetchComTimeout(`https://www.receitaws.com.br/v1/cnpj/${cnpjLimpo}`, {}, 7000);
+    if (res.ok) {
+      json = await res.json();
+    }
+  } catch (err) {}
+
+  // Tentativa 3: JSONP (se estiver no navegador)
+  if (!json && typeof window !== 'undefined' && typeof document !== 'undefined') {
+    try {
+      json = await fetchReceitaWsJsonp(cnpjLimpo, 7000);
+    } catch (err) {}
   }
 
   if (!json || json.status === 'ERROR') throw new Error(json?.message || 'ReceitaWS retornou erro');
@@ -1895,7 +2119,8 @@ async function consultarReceitaWs(cnpjLimpo) {
     nome: s.nome || 'Não informado',
     qualificacao: s.qual || s.qualificacao || 'Sócio / Administrador',
     pais: s.pais_origem || s.pais || 'Brasil',
-    faixaEtaria: 'Não informada'
+    faixaEtaria: 'Não informada',
+    desde: 'Não informada'
   }));
 
   const tributario = {
@@ -1938,7 +2163,7 @@ async function consultarReceitaWs(cnpjLimpo) {
     inscricoes: [],
     qsa,
     socios: qsa,
-    atualizado_em: json.ultima_atualizacao || new Date().toISOString(),
+    atualizado_em: json.ultima_atualizacao || null,
     _provedor: 'ReceitaWS'
   };
 }
@@ -1960,7 +2185,8 @@ function normalizarMinhaReceita(resJson, cnpjLimpo) {
     nome: s.nome_socio || s.nome || 'Não informado',
     qualificacao: s.qualificacao_socio || s.qualificacao || 'Sócio / Administrador',
     pais: s.pais?.nome || s.pais || 'Brasil',
-    faixaEtaria: s.faixa_etaria || 'Não informada'
+    faixaEtaria: s.faixa_etaria || 'Não informada',
+    desde: formatarData(s.data_entrada_sociedade)
   }));
 
   const cnaesSecundarios = (resJson.cnaes_secundarios || []).map(c => ({
@@ -2008,26 +2234,33 @@ function normalizarMinhaReceita(resJson, cnpjLimpo) {
     inscricoes,
     qsa,
     socios: qsa,
-    atualizado_em: resJson.data_situacao_cadastral || new Date().toISOString(),
+    atualizado_em: null,
     _provedor: 'MinhaReceita'
   };
 }
 
 /* ==========================================================================
-   MECANISMO DE CONSULTA PARALELA E SMART MERGE (DATA ENRICHMENT)
+   MECANISMO DE CONSULTA PARALELA E SMART MERGE CAMPO A CAMPO (5 FONTES)
    ========================================================================== */
 
 async function buscarCnpjMaisAtualizado(cnpjLimpo, onStatus = null) {
-  if (onStatus) onStatus('Consultando bases fiscais em paralelo (BrasilAPI, CNPJ.ws, ReceitaWS)...');
+  if (onStatus) onStatus('Consultando 5 bases fiscais em paralelo (CNPJa, CNPJ.ws, LocalizaCNPJ, BrasilAPI, MinhaReceita)...');
 
-  // Disparo simultâneo das 3 fontes públicas em paralelo
+  // Disparo simultâneo das 5 fontes públicas em paralelo
   const promessas = [
-    consultarBrasilApi(cnpjLimpo),
+    consultarCnpjaOpen(cnpjLimpo),
     consultarCnpjWs(cnpjLimpo),
+    consultarLocalizaCnpj(cnpjLimpo),
+    consultarBrasilApi(cnpjLimpo),
     consultarReceitaWs(cnpjLimpo)
   ];
 
   const resultados = await Promise.allSettled(promessas);
+  const cnpjWsResult = resultados[1];
+  let cnpjWsRateLimited = (
+    cnpjWsResult.status === 'rejected' &&
+    (cnpjWsResult.reason?.status === 429 || String(cnpjWsResult.reason?.message || '').includes('429'))
+  );
 
   // Filtra apenas as respostas válidas e completadas com sucesso
   const respostasValidas = resultados
@@ -2038,59 +2271,121 @@ async function buscarCnpjMaisAtualizado(cnpjLimpo, onStatus = null) {
     throw new Error('Nenhuma base pública de CNPJ retornou dados válidos no momento. Por favor, tente novamente em instantes.');
   }
 
-  // 1. Ordena pelo carimbo de data da atualização mais recente para a mais antiga
-  respostasValidas.sort((a, b) => extrairTimestamp(b) - extrairTimestamp(a));
+  // 1. Ordena combinando maior evento cadastral real + carimbo de sincronização da API
+  respostasValidas.sort((a, b) => {
+    const evDiff = extrairMaiorEventoCadastral(b) - extrairMaiorEventoCadastral(a);
+    if (evDiff !== 0) return evDiff;
+    return extrairTimestamp(b) - extrairTimestamp(a);
+  });
 
   // 2. Define a base mais recente como objeto primário
   const maisRecente = { ...respostasValidas[0] };
-  maisRecente._fontesConsultadas = ['BrasilAPI', 'CNPJ.ws', 'ReceitaWS'];
+  maisRecente._fontesConsultadas = ['CNPJa', 'CNPJ.ws', 'LocalizaCNPJ', 'BrasilAPI', 'MinhaReceita'];
   maisRecente._fontesValidas = respostasValidas.map(r => r._provedor);
 
-  // 3. Smart Merge - Inscrição Estadual (SEFAZ / SINTEGRA)
-  if (!maisRecente.inscricoes || maisRecente.inscricoes.length === 0) {
-    const comIE = respostasValidas.find(r => r.inscricoes && r.inscricoes.length > 0);
-    if (comIE) {
-      maisRecente.inscricoes = comIE.inscricoes;
-      maisRecente._ieFonte = comIE._provedor;
+  // 3. Smart Merge - Situação Cadastral mais recente entre todas as fontes
+  let melhorDataSit = parseDataBrOuIso(maisRecente.data_situacao_cadastral);
+  respostasValidas.forEach(r => {
+    const tsSit = parseDataBrOuIso(r.data_situacao_cadastral);
+    if (tsSit > melhorDataSit && r.descricao_situacao_cadastral) {
+      melhorDataSit = tsSit;
+      maisRecente.situacao_cadastral = r.situacao_cadastral;
+      maisRecente.descricao_situacao_cadastral = r.descricao_situacao_cadastral;
+      maisRecente.data_situacao_cadastral = r.data_situacao_cadastral;
     }
+  });
+
+  // 4. Smart Merge - Unificação e Deduplicação de Inscrições Estaduais (SEFAZ / SINTEGRA)
+  const mapaIEs = new Map();
+  respostasValidas.forEach(r => {
+    if (Array.isArray(r.inscricoes) && r.inscricoes.length > 0) {
+      r.inscricoes.forEach(ie => {
+        const chave = `${ie.uf || ''}:${String(ie.ie).replace(/\D/g, '')}`;
+        const existente = mapaIEs.get(chave);
+        const tsNovo = parseDataBrOuIso(ie.dataAtualizacao);
+        const tsExistente = existente ? parseDataBrOuIso(existente.dataAtualizacao) : -1;
+        if (!existente || tsNovo >= tsExistente) {
+          mapaIEs.set(chave, { ...ie, _fonte: r._provedor });
+        }
+      });
+    }
+  });
+  maisRecente.inscricoes = Array.from(mapaIEs.values());
+  if (maisRecente.inscricoes.length > 0) {
+    maisRecente._ieFonte = maisRecente.inscricoes[0]._fonte || 'CNPJ.ws';
+  } else if (cnpjWsRateLimited) {
+    // Marca que a fonte de Sintegra (CNPJ.ws) estava em rate-limit (3 req/min) para não congelar no cache
+    maisRecente._iePendente = true;
   }
 
-  // 4. Smart Merge - QSA / Sócios
-  if (!maisRecente.qsa || maisRecente.qsa.length === 0) {
-    const comQsa = respostasValidas.find(r => r.qsa && r.qsa.length > 0);
-    if (comQsa) {
-      maisRecente.qsa = comQsa.qsa;
-      maisRecente.socios = comQsa.qsa;
-      maisRecente._qsaFonte = comQsa._provedor;
+  // 5. Smart Merge - QSA / Sócios (prefere a fonte com entrada societária mais recente ou maior completude)
+  let melhorQsa = maisRecente.qsa || [];
+  let maiorDataSocio = Math.max(0, ...melhorQsa.map(s => parseDataBrOuIso(s.desde)));
+  respostasValidas.forEach(r => {
+    if (Array.isArray(r.qsa) && r.qsa.length > 0) {
+      const maxSocioR = Math.max(0, ...r.qsa.map(s => parseDataBrOuIso(s.desde)));
+      if (
+        melhorQsa.length === 0 ||
+        maxSocioR > maiorDataSocio ||
+        (maxSocioR === maiorDataSocio && r.qsa.length > melhorQsa.length)
+      ) {
+        melhorQsa = r.qsa;
+        maiorDataSocio = maxSocioR;
+        maisRecente._qsaFonte = r._provedor;
+      }
     }
-  }
+  });
+  maisRecente.qsa = melhorQsa;
+  maisRecente.socios = melhorQsa;
 
-  // 5. Smart Merge - Dados Tributários (Simples / MEI)
-  if (
-    maisRecente.tributario.dataOpcaoSimples === 'Não informada' ||
-    maisRecente.tributario.dataOpcaoSimples === 'Não aplicável'
-  ) {
-    const comSimples = respostasValidas.find(
-      r => r.tributario &&
-      r.tributario.dataOpcaoSimples &&
-      r.tributario.dataOpcaoSimples !== 'Não informada' &&
-      r.tributario.dataOpcaoSimples !== 'Não aplicável'
+  // 6. Smart Merge - Dados Tributários (Simples / MEI) com base na data de evento mais recente
+  respostasValidas.forEach(r => {
+    if (!r.tributario) return;
+    const tsAtualSimples = Math.max(
+      parseDataBrOuIso(maisRecente.tributario?.dataOpcaoSimples),
+      parseDataBrOuIso(maisRecente.tributario?.dataExclusaoSimples)
     );
-    if (comSimples) {
-      maisRecente.tributario = { ...maisRecente.tributario, ...comSimples.tributario };
+    const tsNovoSimples = Math.max(
+      parseDataBrOuIso(r.tributario.dataOpcaoSimples),
+      parseDataBrOuIso(r.tributario.dataExclusaoSimples)
+    );
+    if (tsNovoSimples > tsAtualSimples) {
+      maisRecente.tributario = { ...maisRecente.tributario, ...r.tributario };
+    } else if (tsAtualSimples === 0 && r.tributario.optanteSimples) {
+      maisRecente.tributario.optanteSimples = true;
     }
-  }
+    if (r.tributario.optanteSimei && !maisRecente.tributario.optanteSimei) {
+      const tsExclusaoMei = parseDataBrOuIso(maisRecente.tributario.dataExclusaoSimei);
+      const tsOpcaoMei = parseDataBrOuIso(r.tributario.dataOpcaoSimei);
+      if (tsOpcaoMei >= tsExclusaoMei) {
+        maisRecente.tributario.optanteSimei = true;
+        if (r.tributario.dataOpcaoSimei && r.tributario.dataOpcaoSimei !== 'Não informada') {
+          maisRecente.tributario.dataOpcaoSimei = r.tributario.dataOpcaoSimei;
+        }
+      }
+    }
+  });
+
+  // 7. Data real de sincronização mais recente entre as fontes que fornecem timestamp ISO real (CNPJa / CNPJ.ws)
+  const datasSinc = respostasValidas
+    .map(r => r.atualizado_em)
+    .filter(Boolean)
+    .sort((a, b) => parseDataBrOuIso(b) - parseDataBrOuIso(a));
+  maisRecente.atualizado_em = datasSinc[0] || null;
 
   return maisRecente;
 }
 
 /* Core de Consulta com Cache Local */
-async function buscarDadosCnpj(cnpjLimpo, onProvider = null) {
-  // 0. Cache Local
-  const doCache = obterCnpjCache(cnpjLimpo);
-  if (doCache) {
-    if (onProvider) onProvider('Cache Local');
-    return { ...doCache, _doCache: true };
+async function buscarDadosCnpj(cnpjLimpo, onProvider = null, ignorarCache = false) {
+  if (!ignorarCache) {
+    const doCache = obterCnpjCache(cnpjLimpo);
+    if (doCache) {
+      if (onProvider) onProvider('Cache Local');
+      return { ...doCache, _doCache: true };
+    }
+  } else {
+    removerCnpjCache(cnpjLimpo);
   }
 
   const resultado = await buscarCnpjMaisAtualizado(cnpjLimpo, onProvider);
@@ -2099,12 +2394,12 @@ async function buscarDadosCnpj(cnpjLimpo, onProvider = null) {
 }
 
 /* Busca com Retry e Backoff Exponencial */
-async function buscarDadosCnpjComRetry(cnpjLimpo, maxTentativas = 2, onStatus = null) {
+async function buscarDadosCnpjComRetry(cnpjLimpo, maxTentativas = 2, onStatus = null, ignorarCache = false) {
   for (let tentativa = 1; tentativa <= maxTentativas; tentativa++) {
     try {
       const data = await buscarDadosCnpj(cnpjLimpo, (prov) => {
         if (onStatus) onStatus(prov);
-      });
+      }, ignorarCache);
       return data;
     } catch (err) {
       if (tentativa < maxTentativas) {
@@ -2144,7 +2439,7 @@ function copiarCnpjParaSintegra(cnpj, uf) {
 }
 
 /* Renderizador Dedicado da Seção 03: Inscrições Estaduais & SINTEGRA */
-function renderizarSecaoInscricoes(inscricoes, uf, cnpjFormatado, cnpjLimpo) {
+function renderizarSecaoInscricoes(inscricoes, uf, cnpjFormatado, cnpjLimpo, iePendente = false) {
   const listaIEDiv = document.getElementById('listaIE');
   if (!listaIEDiv) return;
   listaIEDiv.innerHTML = '';
@@ -2156,12 +2451,16 @@ function renderizarSecaoInscricoes(inscricoes, uf, cnpjFormatado, cnpjLimpo) {
     // Estado Vazio com CTA Inteligente e Cópia de CNPJ
     const emptyBox = document.createElement('div');
     emptyBox.className = 'sintegra-empty-box';
+    const tituloVazio = iePendente
+      ? 'Limite de 3 consultas/minuto da base pública de IE atingido neste instante'
+      : 'Nenhuma Inscrição Estadual ativa encontrada nas bases abertas';
+    const descVazio = iePendente
+      ? 'A base pública de Inscrições Estaduais (CNPJ.ws) limita 3 consultas por minuto por IP. Aguarde ~20 segundos e clique em "Atualizar Dados (Ignorar Cache)" no topo, ou consulte direto na SEFAZ abaixo:'
+      : 'Inscrições com status suspenso, baixado, isenção de IE ou alterações cadastrais recentes podem não constar nas APIs públicas gratuitas e exigem verificação direta no fisco estadual.';
     emptyBox.innerHTML = `
       <div class="sintegra-empty-box__icon">🔍</div>
-      <h3 class="sintegra-empty-box__title">Nenhuma Inscrição Estadual ativa encontrada nas bases abertas</h3>
-      <p class="sintegra-empty-box__desc">
-        Inscrições com status suspenso, baixado, isenção de IE ou alterações cadastrais recentes podem não constar nas APIs públicas gratuitas e exigem verificação direta no fisco estadual.
-      </p>
+      <h3 class="sintegra-empty-box__title">${tituloVazio}</h3>
+      <p class="sintegra-empty-box__desc">${descVazio}</p>
       <a href="${urlSintegra}" target="_blank" rel="noopener noreferrer" class="btn-sintegra-action" onclick="copiarCnpjParaSintegra('${cnpjLimpo}', '${ufDestino}')">
         <span>🔍 Consultar no SINTEGRA / SEFAZ (${ufDestino})</span>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
@@ -2173,7 +2472,7 @@ function renderizarSecaoInscricoes(inscricoes, uf, cnpjFormatado, cnpjLimpo) {
     inscricoes.forEach(ie => {
       const isAtivo = ie.ativo === true;
       const statusClass = isAtivo ? 'active' : 'inactive';
-      const statusTexto = isAtivo ? 'Habilitada / Ativa' : 'Inativa / Suspensa';
+      const statusTexto = ie.status || (isAtivo ? 'Habilitada / Ativa' : 'Inativa / Suspensa');
 
       const ficha = document.createElement('div');
       ficha.className = 'ficha';
@@ -2219,13 +2518,13 @@ function renderizarSecaoInscricoes(inscricoes, uf, cnpjFormatado, cnpjLimpo) {
   }
 }
 
-async function executarConsulta(cnpjLimpo) {
+async function executarConsulta(cnpjLimpo, ignorarCache = false) {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('resultado').style.display = 'none';
   document.getElementById('erro').style.display = 'none';
 
   try {
-    dadosAtivos = await buscarDadosCnpjComRetry(cnpjLimpo, 2);
+    dadosAtivos = await buscarDadosCnpjComRetry(cnpjLimpo, 2, null, ignorarCache);
     salvarNoHistorico(cnpjLimpo, dadosAtivos.razao_social);
 
     document.getElementById('loading').style.display = 'none';
@@ -2280,6 +2579,20 @@ async function executarConsulta(cnpjLimpo) {
       riskTags.appendChild(span);
     });
 
+    // Barra de Proveniência & Sincronização das Fontes
+    const provenanceBar = document.getElementById('provenanceBar');
+    if (provenanceBar) {
+      const fontesTxt = Array.isArray(dadosAtivos._fontesValidas) && dadosAtivos._fontesValidas.length > 0
+        ? dadosAtivos._fontesValidas.join(' + ')
+        : (dadosAtivos._provedor || 'Multi-Fonte');
+      const dataBaseTxt = dadosAtivos.atualizado_em ? formatarData(dadosAtivos.atualizado_em) : 'Sincronizada';
+      const origemCacheTxt = dadosAtivos._doCache ? '⚡ Lido do Cache Local' : '🌐 Consulta em Tempo Real nas APIs';
+      provenanceBar.innerHTML = `
+        <span><strong>Fontes unificadas:</strong> ${fontesTxt}</span>
+        <span><strong>Última sinc. da base:</strong> ${dataBaseTxt} · ${origemCacheTxt}</span>
+      `;
+    }
+
     // Seção 01: Identificação
     document.getElementById('resCnpj').innerText = dadosAtivos.cnpjFormatado;
     document.getElementById('resAbertura').innerText = dadosAtivos.data_inicio_atividade || 'Não informada';
@@ -2324,46 +2637,14 @@ async function executarConsulta(cnpjLimpo) {
     document.getElementById('resSimeiData').innerText = dadosAtivos.tributario.dataOpcaoSimei;
     document.getElementById('resSimeiExclusao').innerText = dadosAtivos.tributario.dataExclusaoSimei;
 
-    // Seção 03: Inscrições Estaduais
-    const listaIEDiv = document.getElementById('listaIE');
-    listaIEDiv.innerHTML = '';
-
-    if (dadosAtivos.inscricoes.length === 0) {
-      listaIEDiv.innerHTML = `<div class="empty-note">Nenhuma Inscrição Estadual vinculada encontrada para este CNPJ.</div>`;
-    } else {
-      dadosAtivos.inscricoes.forEach(ie => {
-        const isAtivo = ie.ativo === true;
-        const statusClass = isAtivo ? 'active' : 'inactive';
-        const statusTexto = isAtivo ? 'Habilitada / Ativa' : 'Inativa / Suspensa';
-
-        const ficha = document.createElement('div');
-        ficha.className = 'ficha';
-        ficha.innerHTML = `
-          <div class="ficha__tab">${ie.uf}</div>
-          <div class="ficha__body">
-            <div class="ficha__top">
-              <span style="font-size:0.8rem; color:var(--muted);">Cadastro ICMS Estadual</span>
-              <span style="font-family:var(--font-mono); font-weight:600;">IE: ${ie.ie}</span>
-            </div>
-            <div class="ficha-grid">
-              <div>
-                <label>Situação Cadastral</label>
-                <span class="status-pill ${statusClass}">${statusTexto}</span>
-              </div>
-              <div>
-                <label>Última Atualização</label>
-                <span class="value is-mono">${ie.dataAtualizacao || 'Não informada'}</span>
-              </div>
-              <div>
-                <label>Estado (UF)</label>
-                <span class="value is-mono">${ie.uf}</span>
-              </div>
-            </div>
-          </div>
-        `;
-        listaIEDiv.appendChild(ficha);
-      });
-    }
+    // Seção 03: Inscrições Estaduais (SINTEGRA / SEFAZ) usando o renderizador dedicado
+    renderizarSecaoInscricoes(
+      dadosAtivos.inscricoes,
+      dadosAtivos.uf,
+      dadosAtivos.cnpjFormatado,
+      dadosAtivos.cnpj,
+      Boolean(dadosAtivos._iePendente)
+    );
 
     // Seção 04: QSA
     const listaQSADiv = document.getElementById('listaQSA');
@@ -2375,6 +2656,9 @@ async function executarConsulta(cnpjLimpo) {
       dadosAtivos.socios.forEach((s, idx) => {
         const ficha = document.createElement('div');
         ficha.className = 'ficha';
+        const blocoDesde = (s.desde && s.desde !== 'Não informada')
+          ? `<div><label>Entrada na Sociedade</label><span class="value is-mono">${s.desde}</span></div>`
+          : '';
         ficha.innerHTML = `
           <div class="ficha__tab" style="font-size: 1.1rem;">#${idx + 1}</div>
           <div class="ficha__body">
@@ -2383,6 +2667,7 @@ async function executarConsulta(cnpjLimpo) {
               <span class="status-pill active" style="font-family:var(--font-mono); font-weight:500;">${s.qualificacao || 'Qualificação não informada'}</span>
             </div>
             <div class="ficha-grid">
+              ${blocoDesde}
               <div>
                 <label>País de Origem</label>
                 <span class="value is-mono">${s.pais || 'Brasil'}</span>
@@ -2414,8 +2699,19 @@ document.getElementById('formSIBADE').addEventListener('submit', function(e) {
     mostrarErro('Informe um CNPJ válido com 14 dígitos.');
     return;
   }
-  executarConsulta(cnpjLimpo);
+  executarConsulta(cnpjLimpo, false);
 });
+
+const btnForcarAtualizacao = document.getElementById('btnForcarAtualizacao');
+if (btnForcarAtualizacao) {
+  btnForcarAtualizacao.addEventListener('click', function() {
+    const cnpjLimpo = (dadosAtivos?.cnpj || document.getElementById('cnpj').value || '').replace(/\D/g, '');
+    if (cnpjLimpo.length === 14) {
+      showToast('🔄 Reconsultando todas as 5 bases fiscais em tempo real...', 2500);
+      executarConsulta(cnpjLimpo, true);
+    }
+  });
+}
 
 document.getElementById('btnImprimir').addEventListener('click', () => window.print());
 
